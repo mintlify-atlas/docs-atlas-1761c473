@@ -1,0 +1,172 @@
+{
+  "projectType": "framework",
+  "projectName": "n8n",
+  "projectDescription": "Fair-code workflow automation platform with native AI capabilities and 400+ integrations",
+  "theme": "aspen",
+  "primaryColor": "#ea4b71",
+  "lightColor": "#ff6d5a",
+  "darkColor": "#ea4b71",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation",
+              "core-concepts"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "hosting/overview",
+              "hosting/docker",
+              "hosting/configuration",
+              "hosting/scaling"
+            ]
+          },
+          {
+            "group": "Building Workflows",
+            "pages": [
+              "workflows/creating-workflows",
+              "workflows/nodes-overview",
+              "workflows/expressions",
+              "workflows/error-handling",
+              "workflows/execution-modes"
+            ]
+          },
+          {
+            "group": "AI Workflows",
+            "pages": [
+              "ai/overview",
+              "ai/agents",
+              "ai/langchain-nodes",
+              "ai/vector-stores",
+              "ai/embeddings"
+            ]
+          },
+          {
+            "group": "Node Development",
+            "pages": [
+              "node-development/overview",
+              "node-development/node-structure",
+              "node-development/credentials",
+              "node-development/testing",
+              "node-development/versioning"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/commands",
+              "cli/execution",
+              "cli/import-export",
+              "cli/user-management"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/workflows",
+              "api/executions",
+              "api/credentials"
+            ]
+          },
+          {
+            "group": "Node API",
+            "pages": [
+              "api/node-types",
+              "api/node-execution",
+              "api/node-parameters"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Integration Catalog",
+            "pages": [
+              "integrations/overview",
+              "integrations/popular-nodes",
+              "integrations/triggers",
+              "integrations/actions"
+            ]
+          },
+          {
+            "group": "AI Integrations",
+            "pages": [
+              "integrations/ai/openai",
+              "integrations/ai/anthropic",
+              "integrations/ai/google-gemini",
+              "integrations/ai/langchain"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "contributing/setup",
+              "contributing/architecture",
+              "contributing/testing",
+              "contributing/guidelines"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Visual workflow builder with 400+ integrations",
+    "Native AI capabilities with LangChain",
+    "Code nodes supporting JavaScript and Python",
+    "Self-hosted or cloud deployment options",
+    "Fair-code license (Sustainable Use License)",
+    "Webhook and polling triggers",
+    "Advanced error handling and retry logic",
+    "Database support (SQLite, PostgreSQL)",
+    "Scalable worker mode for distributed execution",
+    "REST API for workflow management",
+    "OAuth2 credential management",
+    "Custom node development SDK"
+  ],
+  "publicApiSurface": [
+    "CLI: n8n start",
+    "CLI: n8n worker",
+    "CLI: n8n webhook",
+    "CLI: n8n execute",
+    "CLI: n8n import",
+    "CLI: n8n export",
+    "REST API: /workflows",
+    "REST API: /executions",
+    "REST API: /credentials",
+    "REST API: /nodes",
+    "Node SDK: INodeType interface",
+    "Node SDK: INodeTypeDescription",
+    "Node SDK: execute() method",
+    "Node SDK: trigger() method",
+    "Node SDK: webhook() method",
+    "Node SDK: poll() method",
+    "Core: n8n-workflow package",
+    "Core: n8n-core package",
+    "AI: @n8n/nodes-langchain package",
+    "Package: @n8n/api-types",
+    "Package: n8n-nodes-base (400+ nodes)"
+  ]
+}
