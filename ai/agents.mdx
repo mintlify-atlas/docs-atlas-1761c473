@@ -1,0 +1,530 @@
+---
+title: AI Agents
+description: Build autonomous AI agents in n8n that can use tools, reason about problems, and execute complex multi-step tasks
+---
+
+# AI Agents
+
+AI Agents are autonomous systems that can reason about problems, use tools, and execute multi-step tasks to achieve goals. In n8n, agents are built on LangChain and can be easily integrated into your workflows.
+
+## What is an AI Agent?
+
+An AI agent is a language model that can:
+
+- **Reason**: Think through problems step-by-step
+- **Use Tools**: Call external functions, APIs, or workflows
+- **Make Decisions**: Choose which tools to use and when
+- **Maintain Context**: Remember previous interactions with memory
+- **Iterate**: Try different approaches until a goal is achieved
+
+<Note>
+  Unlike simple LLM chains that execute linearly, agents can loop, make decisions, and adapt their approach based on intermediate results.
+</Note>
+
+## Agent Node
+
+The **AI Agent** node (`@n8n/n8n-nodes-langchain.agent`) is the core component for building agent workflows in n8n.
+
+### Key Features
+
+- **Multiple Input Types**: Accept prompts from previous nodes, define custom prompts, or use guardrails
+- **Tool Support**: Connect multiple tools for the agent to use
+- **Memory Integration**: Add memory nodes for conversation context
+- **Output Parsing**: Structure agent responses with custom schemas
+- **Streaming Support**: Stream responses in real-time
+- **Fallback Models**: Configure backup language models for reliability
+
+### Configuration Options
+
+<CodeGroup>
+```typescript Agent Node Structure
+{
+  displayName: 'AI Agent',
+  name: 'agent',
+  inputs: [
+    'main',                    // Input data
+    'ai_languageModel',        // Required: LLM connection
+    'ai_memory',               // Optional: Memory
+    'ai_tool',                 // Optional: Tools (multiple)
+    'ai_outputParser'          // Optional: Output parser
+  ],
+  outputs: ['main']
+}
+```
+
+```typescript Prompt Configuration
+// Option 1: Auto (from previous node)
+promptType: 'auto'
+// Uses chatInput, chat_input, or input from previous node
+
+// Option 2: Define custom prompt
+promptType: 'define'
+text: 'You are a helpful assistant...'
+
+// Option 3: From Guardrails node
+promptType: 'guardrails'
+```
+</CodeGroup>
+
+## Building Your First Agent
+
+<Steps>
+  <Step title="Add a Trigger">
+    Start with a Chat Trigger or Manual Chat Trigger node to receive input.
+    
+    ```json
+    {
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "name": "When chat message received"
+    }
+    ```
+  </Step>
+  
+  <Step title="Add a Language Model">
+    Connect a language model like OpenAI Chat Model.
+    
+    ```typescript
+    {
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "parameters": {
+        "model": "gpt-4",
+        "temperature": 0.7
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Add Tools (Optional)">
+    Connect tool nodes to give your agent capabilities.
+    
+    Available tools:
+    - Calculator Tool
+    - HTTP Request Tool
+    - Wikipedia Tool
+    - Workflow Tool (call other n8n workflows)
+    - Code Tool
+    - Vector Store Tool
+  </Step>
+  
+  <Step title="Add Memory (Optional)">
+    Connect a memory node to maintain conversation context.
+    
+    ```typescript
+    {
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "parameters": {
+        "contextWindowLength": 10
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Configure the Agent">
+    Add the AI Agent node and configure the prompt.
+    
+    ```typescript
+    {
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "parameters": {
+        "promptType": "auto"
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Agent Architecture
+
+From the source code (`/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/agents/Agent/V3/AgentV3.node.ts:25`), the agent uses a "Tools Agent" architecture:
+
+```typescript
+export class AgentV3 implements INodeType {
+  description: INodeTypeDescription;
+  
+  constructor(baseDescription: INodeTypeBaseDescription) {
+    this.description = {
+      ...baseDescription,
+      version: [3, 3.1],
+      defaults: {
+        name: 'AI Agent',
+        color: '#404040',
+      },
+      builderHint: {
+        inputs: {
+          ai_languageModel: { required: true },
+          ai_memory: { required: false },
+          ai_tool: { required: false },
+          ai_outputParser: { required: false }
+        }
+      }
+    };
+  }
+}
+```
+
+## Agent Tools
+
+Tools extend what your agent can do. Here are the built-in tools:
+
+### Calculator Tool
+
+Perform mathematical calculations:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+  "name": "Calculator"
+}
+```
+
+### HTTP Request Tool
+
+Make API calls:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+  "parameters": {
+    "method": "GET",
+    "url": "https://api.example.com"
+  }
+}
+```
+
+### Workflow Tool
+
+The most powerful tool - call other n8n workflows!
+
+From the source (`/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/tools/ToolWorkflow/ToolWorkflow.node.ts:10`):
+
+```typescript
+{
+  displayName: 'Call n8n Sub-Workflow Tool',
+  name: 'toolWorkflow',
+  description: 'Uses another n8n workflow as a tool. Allows packaging any n8n node(s) as a tool.'
+}
+```
+
+<Tip>
+  The Workflow Tool is incredibly powerful - you can turn ANY n8n workflow into a tool that your agent can use. This means you can give your agent access to databases, APIs, file systems, and more!
+</Tip>
+
+### Vector Store Tool
+
+Query vector databases for semantic search:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+  "parameters": {
+    "name": "knowledge_base",
+    "description": "Search the company knowledge base"
+  }
+}
+```
+
+### Code Tool
+
+Execute JavaScript or Python code:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolCode",
+  "parameters": {
+    "language": "javascript",
+    "code": "// Your code here"
+  }
+}
+```
+
+### Wikipedia Tool
+
+Search Wikipedia:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolWikipedia"
+}
+```
+
+### SerpAPI Tool
+
+Search Google:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolSerpApi"
+}
+```
+
+### Wolfram Alpha Tool
+
+Computational knowledge:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.toolWolframAlpha"
+}
+```
+
+## Memory for Agents
+
+Memory allows agents to maintain context across multiple interactions. Choose the right memory type for your use case:
+
+### Simple Memory (Development)
+
+**Node**: `memoryBufferWindow`  
+**Best for**: Development and testing
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+  "parameters": {
+    "sessionIdType": "customKey",
+    "sessionKey": "{{ $json.sessionId }}",
+    "contextWindowLength": 10
+  }
+}
+```
+
+<Note>
+  Simple Memory stores data in n8n's memory. Not suitable for production environments with Queue Mode or multi-main setups.
+</Note>
+
+### Redis Memory (Production)
+
+**Node**: `memoryRedisChat`  
+**Best for**: Production with distributed workers
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+  "credentials": "redisApi"
+}
+```
+
+### Postgres Memory
+
+**Node**: `memoryPostgresChat`  
+**Best for**: Persistent, queryable conversation history
+
+### MongoDB Memory
+
+**Node**: `memoryMongoDbChat`  
+**Best for**: Document-based storage with flexibility
+
+### Zep Memory
+
+**Node**: `memoryZep`  
+**Best for**: Advanced features like automatic summarization and fact extraction
+
+## Output Parsing
+
+Structure agent responses into reliable formats:
+
+### Structured Output Parser
+
+Define custom JSON schemas:
+```json
+{
+  "type": "object",
+  "properties": {
+    "answer": { "type": "string" },
+    "confidence": { "type": "number" },
+    "sources": { "type": "array" }
+  }
+}
+```
+
+### Auto-fixing Output Parser
+
+Automatically fix malformed JSON responses:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing"
+}
+```
+
+### Item List Output Parser
+
+Extract lists from responses:
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.outputParserItemList"
+}
+```
+
+## Advanced Agent Patterns
+
+### Multi-Step Reasoning Agent
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      { "type": "chatTrigger" },
+      { "type": "lmChatOpenAi", "model": "gpt-4" },
+      { "type": "toolCalculator" },
+      { "type": "toolWikipedia" },
+      { "type": "toolWorkflow", "description": "Database query tool" },
+      { "type": "memoryRedisChat" },
+      { "type": "agent" }
+    ]
+  }
+}
+```
+
+### RAG Agent with Vector Search
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      { "type": "chatTrigger" },
+      { "type": "lmChatOpenAi" },
+      { "type": "toolVectorStore", "vectorStore": "pinecone" },
+      { "type": "memoryBufferWindow" },
+      { "type": "agent" }
+    ]
+  }
+}
+```
+
+### Research Agent
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      { "type": "manualChatTrigger" },
+      { "type": "lmChatOpenAi", "model": "gpt-4" },
+      { "type": "toolSerpApi" },
+      { "type": "toolWikipedia" },
+      { "type": "toolHttpRequest" },
+      { "type": "agent" }
+    ]
+  }
+}
+```
+
+## Best Practices
+
+<Tip>
+  **Clear Tool Descriptions**: The agent decides which tools to use based on their descriptions. Make them clear and specific!
+</Tip>
+
+### Prompt Engineering
+
+- Be specific about the agent's role and capabilities
+- Provide examples of desired behavior
+- Set clear boundaries and constraints
+- Define success criteria
+
+### Tool Design
+
+- Keep tools focused on a single responsibility
+- Provide comprehensive tool descriptions
+- Handle errors gracefully
+- Return structured data when possible
+
+### Memory Management
+
+- Choose appropriate context window length
+- Use session IDs to separate conversations
+- Clean up old sessions periodically
+- Consider costs of large context windows
+
+### Performance
+
+- Use faster models (GPT-3.5) for tool selection
+- Limit the number of available tools
+- Implement tool result caching when possible
+- Monitor token usage and costs
+
+### Error Handling
+
+- Enable "Continue on Fail" in production
+- Implement fallback language models
+- Add error handling in custom tools
+- Log agent reasoning for debugging
+
+## OpenAI Assistant Node
+
+For OpenAI-specific features, use the OpenAI Assistant node:
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.openAiAssistant",
+  "parameters": {
+    "assistantId": "asst_xxx"
+  }
+}
+```
+
+Features:
+- Code Interpreter
+- File Search
+- Function Calling
+- Persistent threads
+
+## Debugging Agents
+
+### Enable Streaming
+
+Watch the agent's thought process in real-time:
+```typescript
+{
+  "parameters": {
+    "enableStreaming": true
+  }
+}
+```
+
+### Check Intermediate Steps
+
+The agent response includes metadata about tool usage:
+```json
+{
+  "output": "Final answer",
+  "intermediateSteps": [
+    {
+      "action": "calculator",
+      "input": "12 * 45",
+      "output": "540"
+    }
+  ]
+}
+```
+
+## Common Issues
+
+### Agent Loops Forever
+
+- Check tool descriptions are clear
+- Ensure tools return useful data
+- Set max iterations limit
+- Verify prompt instructs agent when to stop
+
+### Agent Doesn't Use Tools
+
+- Make tool descriptions more specific
+- Adjust temperature (try 0.7-0.9)
+- Check tool is actually connected
+- Try a more capable model (GPT-4)
+
+### High Token Usage
+
+- Reduce context window length
+- Limit number of tools
+- Use smaller embedding models
+- Implement result summarization
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="LangChain Nodes" icon="link" href="/ai/langchain-nodes">
+    Explore all available LangChain nodes
+  </Card>
+  <Card title="Vector Stores" icon="database" href="/ai/vector-stores">
+    Add knowledge retrieval to your agents
+  </Card>
+  <Card title="Example Workflows" icon="workflow">
+    Browse agent workflow templates
+  </Card>
+  <Card title="Advanced Tutorial" icon="graduation-cap" href="https://docs.n8n.io/advanced-ai/intro-tutorial/">
+    Complete agent building tutorial
+  </Card>
+</CardGroup>

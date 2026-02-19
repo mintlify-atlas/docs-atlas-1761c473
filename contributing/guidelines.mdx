@@ -1,0 +1,541 @@
+---
+title: Contribution Guidelines
+description: Guidelines for submitting pull requests, coding standards, and contributing to the n8n project
+---
+
+## Code of Conduct
+
+This project is governed by the [Code of Conduct](https://github.com/n8n-io/n8n/blob/master/CODE_OF_CONDUCT.md). By participating, you agree to uphold this code. Report unacceptable behavior to jan@n8n.io.
+
+## Before You Contribute
+
+### New Nodes
+
+<Warning>
+**PRs introducing new nodes will be auto-closed** unless explicitly requested by the n8n team and aligned with project scope.
+
+Instead, consider [building your own custom nodes](https://docs.n8n.io/integrations/creating-nodes/overview/) and publishing them to npm.
+</Warning>
+
+### Typo-Only PRs
+
+Typo-only PRs are not accepted. Combine typo fixes with meaningful code contributions.
+
+### Large Changes
+
+For significant architectural changes or new features, please open an issue or discussion first to align with project direction.
+
+## Development Workflow
+
+### 1. Create a Branch
+
+<Steps>
+
+<Step title="Sync with upstream (external contributors)">
+```bash
+git fetch upstream
+git checkout master
+git merge upstream/master
+```
+</Step>
+
+<Step title="Create a feature branch">
+For n8n team members, use the Linear ticket branch name:
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+For external contributors:
+
+```bash
+git checkout -b your-feature-name
+```
+</Step>
+
+</Steps>
+
+### 2. Make Your Changes
+
+<Accordion title="Backend Development">
+1. Navigate to the relevant package (e.g., `packages/cli`)
+2. Start development mode:
+   ```bash
+   cd packages/cli
+   pnpm dev
+   ```
+3. Make your changes
+4. Add or update tests
+</Accordion>
+
+<Accordion title="Frontend Development">
+1. Start backend:
+   ```bash
+   cd packages/cli
+   pnpm dev
+   ```
+2. In a new terminal, start frontend:
+   ```bash
+   cd packages/frontend/editor-ui
+   pnpm dev
+   ```
+3. Make your changes
+4. Add or update tests
+5. Ensure all UI text uses i18n
+</Accordion>
+
+<Accordion title="Node Development">
+1. Watch nodes package:
+   ```bash
+   cd packages/nodes-base
+   pnpm dev
+   ```
+2. In a new terminal, start CLI with hot reload:
+   ```bash
+   cd packages/cli
+   N8N_DEV_RELOAD=true pnpm dev
+   ```
+3. Make your changes
+4. Add workflow tests (see examples in `packages/nodes-base/nodes/**/test`)
+</Accordion>
+
+### 3. Testing
+
+<Steps>
+
+<Step title="Run tests locally">
+```bash
+# Run tests for your package
+cd packages/cli
+pnpm test
+
+# Run affected tests only
+pnpm test:affected
+```
+</Step>
+
+<Step title="Run typecheck">
+```bash
+cd packages/cli
+pnpm typecheck
+```
+
+<Warning>
+**Critical:** Always run `pnpm typecheck` before committing. TypeScript errors will fail CI.
+</Warning>
+</Step>
+
+<Step title="Run linter">
+```bash
+cd packages/cli
+pnpm lint
+
+# Auto-fix issues
+pnpm lint:fix
+```
+</Step>
+
+<Step title="Test in production mode">
+```bash
+# From root
+pnpm build
+pnpm start
+```
+
+Verify your changes work in production mode.
+</Step>
+
+</Steps>
+
+### 4. Commit Your Changes
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+<CodeGroup>
+
+```bash Feature
+git commit -m "feat: add workflow template support"
+```
+
+```bash Fix
+git commit -m "fix: resolve execution memory leak"
+```
+
+```bash Docs
+git commit -m "docs: update API documentation"
+```
+
+```bash Refactor
+git commit -m "refactor: simplify workflow execution logic"
+```
+
+```bash Test
+git commit -m "test: add coverage for credential service"
+```
+
+```bash Chore
+git commit -m "chore: update dependencies"
+```
+
+</CodeGroup>
+
+<Note>
+Commit messages should focus on **why**, not **what**. The diff shows what changed - explain why you made the change.
+</Note>
+
+### 5. Push and Create PR
+
+<Steps>
+
+<Step title="Push your branch">
+```bash
+git push origin your-feature-name
+```
+</Step>
+
+<Step title="Create pull request">
+Go to GitHub and create a pull request from your branch to `n8n-io:master`.
+</Step>
+
+<Step title="Fill PR template">
+Follow the PR template and include:
+- Clear description of changes
+- Link to Linear ticket (team members)
+- Link to related GitHub issues
+- Screenshots/videos for UI changes
+- Breaking change notes (if applicable)
+</Step>
+
+</Steps>
+
+## PR Title Conventions
+
+Follow [n8n's PR title conventions](https://github.com/n8n-io/n8n/blob/master/.github/pull_request_title_conventions.md):
+
+- `feat(package): Description` - New feature
+- `fix(package): Description` - Bug fix
+- `refactor(package): Description` - Code refactoring
+- `perf(package): Description` - Performance improvement
+- `test(package): Description` - Test additions/changes
+- `docs(package): Description` - Documentation changes
+- `ci: Description` - CI/CD changes
+- `chore: Description` - Maintenance tasks
+
+**Examples:**
+- `feat(cli): Add workflow template import`
+- `fix(editor-ui): Resolve canvas zoom issue`
+- `refactor(core): Simplify execution context`
+
+## Coding Standards
+
+### TypeScript
+
+<Note>
+**Never use `any` type** - use proper types or `unknown`:
+
+```typescript
+// Bad
+function process(data: any) { }
+
+// Good
+function process(data: unknown) {
+  if (typeof data === 'string') {
+    // Type-safe processing
+  }
+}
+```
+</Note>
+
+<Note>
+**Avoid type casting with `as`** - use type guards:
+
+```typescript
+// Bad
+const value = data as string;
+
+// Good
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+if (isString(data)) {
+  // Type-safe usage
+}
+```
+
+**Exception:** Type casting is acceptable in test code.
+</Note>
+
+<Warning>
+**No `ts-ignore` comments** - fix the TypeScript error properly:
+
+```typescript
+// Bad
+// @ts-ignore
+const result = someFunction();
+
+// Good
+const result = someFunction() as ExpectedType;
+// Or better: fix the function signature
+```
+</Warning>
+
+### Error Handling
+
+Use modern error classes:
+
+```typescript
+import { UnexpectedError, OperationalError, UserError } from '@n8n/workflow';
+
+// For unexpected errors (bugs)
+throw new UnexpectedError('Database connection failed');
+
+// For operational errors (retryable)
+throw new OperationalError('API rate limit exceeded');
+
+// For user errors (user action required)
+throw new UserError('Invalid workflow configuration');
+```
+
+<Warning>
+**Deprecated:** Do not use `ApplicationError` - it will be removed.
+</Warning>
+
+### Frontend Guidelines
+
+<Note>
+**All UI text must use i18n:**
+
+```vue
+<!-- Bad -->
+<n8n-button>Save Workflow</n8n-button>
+
+<!-- Good -->
+<n8n-button>{{ $locale.baseText('workflows.save') }}</n8n-button>
+```
+
+Add translations to `packages/@n8n/i18n/locales/en/index.json`.
+</Note>
+
+<Note>
+**Use CSS variables** - never hardcode values:
+
+```css
+/* Bad */
+.container {
+  padding: 16px;
+  color: #333333;
+}
+
+/* Good */
+.container {
+  padding: var(--spacing-m);
+  color: var(--color-text-dark);
+}
+```
+</Note>
+
+<Note>
+**data-testid must be a single value:**
+
+```vue
+<!-- Bad -->
+<div data-testid="workflow card"></div>
+
+<!-- Good -->
+<div data-testid="workflow-card"></div>
+```
+</Note>
+
+### Code Reusability
+
+<Note>
+**Avoid repetitive code** - reuse existing components and logic:
+
+```typescript
+// Bad - duplicating parameter definitions
+const operation1Parameters = [
+  { name: 'url', type: 'string' },
+  { name: 'method', type: 'options' },
+];
+
+const operation2Parameters = [
+  { name: 'url', type: 'string' },
+  { name: 'method', type: 'options' },
+];
+
+// Good - reusing shared parameters
+const commonHttpParameters = [
+  { name: 'url', type: 'string' },
+  { name: 'method', type: 'options' },
+];
+
+const operation1Parameters = [...commonHttpParameters];
+const operation2Parameters = [...commonHttpParameters];
+```
+</Note>
+
+### Code Formatting
+
+n8n uses Biome for formatting:
+
+```bash
+# Format code
+pnpm format
+
+# Check formatting
+pnpm format:check
+```
+
+## Testing Requirements
+
+<Warning>
+**PRs must include tests:**
+- Unit tests for new functionality
+- Workflow tests for nodes (see `packages/nodes-base/nodes/**/test`)
+- E2E tests for UI changes (if applicable)
+
+PRs without tests will be **auto-closed after 14 days**.
+</Warning>
+
+### Writing Tests
+
+<CodeGroup>
+
+```typescript Unit Test
+// packages/cli/src/services/workflow.service.test.ts
+import { WorkflowService } from './workflow.service';
+import { mock } from 'jest-mock-extended';
+
+describe('WorkflowService', () => {
+  it('should validate workflow before saving', async () => {
+    const service = new WorkflowService();
+    const workflow = { name: 'Test', nodes: [] };
+
+    await expect(service.save(workflow)).rejects.toThrow('Invalid workflow');
+  });
+});
+```
+
+```typescript Workflow Test
+// packages/nodes-base/nodes/MyNode/test/node/workflow.json
+{
+  "nodes": [
+    {
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger"
+    },
+    {
+      "name": "My Node",
+      "type": "n8n-nodes-base.myNode",
+      "parameters": { "option": "value" }
+    }
+  ]
+}
+```
+
+```typescript E2E Test
+// packages/testing/playwright/tests/workflows/create.spec.ts
+import { test, expect } from '../fixtures/base';
+
+test('should create workflow', async ({ n8n }) => {
+  await n8n.start.fromHome();
+  const name = await n8n.workflowComposer.createWorkflow();
+  await expect(n8n.workflows.getWorkflowByName(name)).toBeVisible();
+});
+```
+
+</CodeGroup>
+
+## PR Review Process
+
+### Community PR Guidelines
+
+<Steps>
+
+<Step title="Initial submission">
+- Ensure PR follows all guidelines above
+- Include tests and documentation
+- Link related issues
+</Step>
+
+<Step title="Review period">
+- Team reviews within 1-2 weeks
+- Address requested changes within **14 days**
+- PRs with no response after 14 days will be auto-closed
+</Step>
+
+<Step title="Changes requested">
+If changes are requested:
+1. Make the requested changes
+2. Push to the same branch
+3. Request re-review
+4. Respond to all review comments
+</Step>
+
+<Step title="Approval and merge">
+- Once approved, team will merge
+- Your contribution will be included in the next release
+</Step>
+
+</Steps>
+
+### Small PRs Only
+
+<Warning>
+**Focus on a single feature or fix per PR.** Large PRs will be requested to be split into smaller ones.
+
+**Good PR:** Adds credential validation for Notion API
+**Bad PR:** Adds 5 new nodes, refactors authentication, and updates documentation
+</Warning>
+
+## Contributor License Agreement
+
+You must sign the [Contributor License Agreement](https://github.com/n8n-io/n8n/blob/master/CONTRIBUTOR_LICENSE_AGREEMENT.md) before your PR can be merged.
+
+An automated bot will comment on your PR with a link to sign. This uses [Indie Open Source](https://indieopensource.com/forms/cla) - a simple, plain-English CLA.
+
+## Additional Resources
+
+### Documentation
+
+The n8n documentation repository is at [n8n-io/n8n-docs](https://github.com/n8n-io/n8n-docs). Contribute documentation improvements there.
+
+### Workflow Templates
+
+Submit workflow templates to n8n's template library. See the [n8n Creator Hub](https://www.notion.so/n8n/n8n-Creator-hub-7bd2cbe0fce0449198ecb23ff4a2f76f) for details.
+
+### Custom Nodes
+
+Learn about [building custom nodes](https://docs.n8n.io/integrations/creating-nodes/overview/) and publishing them to npm. Custom nodes allow you to extend n8n without modifying core.
+
+## Getting Help
+
+- **Questions?** Ask in [n8n Community Forum](https://community.n8n.io/)
+- **Bugs?** Open an issue on [GitHub](https://github.com/n8n-io/n8n/issues)
+- **Feature Requests?** Start a discussion on [GitHub Discussions](https://github.com/n8n-io/n8n/discussions)
+
+## PR Checklist
+
+Before submitting your PR:
+
+- [ ] Code follows n8n coding standards
+- [ ] All tests pass locally
+- [ ] Added tests for new functionality
+- [ ] Ran `pnpm typecheck` successfully
+- [ ] Ran `pnpm lint` and fixed all issues
+- [ ] Tested in production mode (`pnpm build && pnpm start`)
+- [ ] Updated documentation if needed
+- [ ] PR title follows conventions
+- [ ] PR description is clear and complete
+- [ ] Linked related issues/tickets
+- [ ] No `ts-ignore` comments
+- [ ] No hardcoded strings (use i18n for UI text)
+- [ ] No `any` types
+- [ ] Small, focused PR (single feature/fix)
+
+## Next Steps
+
+- Set up your [development environment](/contributing/setup)
+- Learn about [n8n's architecture](/contributing/architecture)
+- Understand [testing practices](/contributing/testing)

@@ -1,0 +1,325 @@
+---
+title: Integration Catalog Overview
+description: Explore n8n's 500+ built-in integrations for workflow automation with APIs, databases, and services
+---
+
+# Integration Catalog Overview
+
+n8n provides a comprehensive catalog of 500+ built-in integrations that enable you to connect and automate workflows across your entire tech stack. From popular SaaS applications to databases, APIs, and internal services, n8n nodes make automation accessible and powerful.
+
+## What are n8n Integrations?
+
+Integrations in n8n are implemented as **nodes** - modular building blocks that connect to external services and perform specific operations. Each node is pre-configured with:
+
+- **Built-in authentication** - OAuth2, API keys, JWT, and more
+- **Pre-defined operations** - Common actions ready to use
+- **Type-safe parameters** - Validated inputs with helpful descriptions
+- **Error handling** - Automatic retries and error management
+- **Resource locators** - Smart selectors for lists, IDs, and URLs
+
+<CardGroup cols={3}>
+  <Card title="Popular Nodes" icon="star" href="/integrations/popular-nodes">
+    Explore the most commonly used integrations
+  </Card>
+  <Card title="Trigger Nodes" icon="bolt" href="/integrations/triggers">
+    Learn about webhook, polling, and schedule triggers
+  </Card>
+  <Card title="Action Nodes" icon="rocket" href="/integrations/actions">
+    Discover action and transformation nodes
+  </Card>
+</CardGroup>
+
+## Integration Categories
+
+### Communication & Collaboration
+
+Connect team communication tools and enhance collaboration:
+
+- **Slack** - Send messages, manage channels, handle notifications
+- **Microsoft Teams** - Post to channels, create meetings, manage teams
+- **Discord** - Manage servers, send messages, handle webhooks
+- **Telegram** - Send messages, handle bot interactions
+- **Mattermost** - Team communication and collaboration
+- **Twilio** - SMS, voice calls, and messaging
+- **WhatsApp** - Business messaging integration
+
+### Productivity & Project Management
+
+Streamline work with project management and productivity tools:
+
+- **Asana** - Tasks, projects, and team workflows
+- **Jira** - Issue tracking and agile project management
+- **Trello** - Boards, lists, and cards management
+- **Monday.com** - Work OS and project tracking
+- **ClickUp** - All-in-one productivity platform
+- **Notion** - Pages, databases, and knowledge management
+- **Linear** - Issue tracking for software teams
+- **Todoist** - Personal task management
+
+### Google Workspace
+
+Full suite of Google services integration:
+
+- **Google Sheets** - Spreadsheet operations and data management
+- **Google Drive** - File storage and sharing
+- **Gmail** - Email sending and management
+- **Google Calendar** - Event scheduling and management
+- **Google Docs** - Document creation and editing
+- **Google Slides** - Presentation management
+- **Google Tasks** - Task management
+- **Google Analytics** - Website analytics data
+- **Google Ads** - Advertising campaign management
+- **Google BigQuery** - Data warehouse operations
+
+### Microsoft 365
+
+Comprehensive Microsoft ecosystem support:
+
+- **Microsoft Excel** - Workbook and spreadsheet operations
+- **Microsoft Outlook** - Email and calendar management
+- **Microsoft OneDrive** - Cloud storage integration
+- **Microsoft SharePoint** - Document management and collaboration
+- **Microsoft Dynamics** - CRM operations
+- **Microsoft SQL** - Database operations
+- **Microsoft Entra** (Azure AD) - Identity and access management
+- **Microsoft Graph Security** - Security operations
+
+### CRM & Sales
+
+Customer relationship management and sales automation:
+
+- **HubSpot** - Marketing, sales, and service CRM
+- **Salesforce** - Enterprise CRM platform
+- **Pipedrive** - Sales pipeline management
+- **Zoho CRM** - Customer relationship management
+- **Freshworks CRM** - Sales and marketing automation
+- **Copper** - CRM for Google Workspace
+- **ActiveCampaign** - Marketing automation and CRM
+
+### Marketing & Email
+
+Marketing automation and email campaign tools:
+
+- **Mailchimp** - Email marketing and automation
+- **SendGrid** - Email delivery and management
+- **Brevo** (Sendinblue) - Email marketing platform
+- **ConvertKit** - Creator marketing platform
+- **GetResponse** - Email marketing and automation
+- **MailerLite** - Email marketing for businesses
+
+### E-commerce & Payments
+
+Online store and payment processing integrations:
+
+- **Shopify** - E-commerce platform integration
+- **WooCommerce** - WordPress e-commerce
+- **Stripe** - Payment processing
+- **PayPal** - Payment gateway
+- **QuickBooks** - Accounting and invoicing
+- **Xero** - Accounting software
+
+### Development & DevOps
+
+Developer tools and infrastructure automation:
+
+- **GitHub** - Repository management and CI/CD
+- **GitLab** - DevOps platform integration
+- **Jenkins** - CI/CD automation
+- **CircleCI** - Continuous integration
+- **Docker** - Container management
+- **Kubernetes** - Container orchestration
+
+### Databases
+
+Direct database connectivity:
+
+- **PostgreSQL** - Relational database operations
+- **MySQL** - SQL database management
+- **MongoDB** - NoSQL document database
+- **Redis** - In-memory data store
+- **Microsoft SQL** - Enterprise database
+- **Snowflake** - Cloud data warehouse
+- **Google BigQuery** - Serverless data warehouse
+- **Airtable** - Spreadsheet-database hybrid
+- **Supabase** - Open source Firebase alternative
+
+### Cloud Services
+
+Major cloud platform integrations:
+
+- **AWS S3** - Object storage
+- **AWS Lambda** - Serverless functions
+- **AWS DynamoDB** - NoSQL database
+- **AWS SQS** - Message queue service
+- **AWS SNS** - Notification service
+- **Google Cloud Storage** - Object storage
+- **Microsoft Azure** - Cloud services
+- **Cloudflare** - CDN and security
+
+### AI & Machine Learning
+
+Artificial intelligence and ML services:
+
+- **OpenAI** - GPT models and AI operations
+- **AI Transform** - Built-in AI data transformation
+- **Google Cloud Natural Language** - Text analysis
+- **AWS Comprehend** - Natural language processing
+- **Perplexity** - AI search and answers
+- **MistralAI** - Open source AI models
+
+### Security & Monitoring
+
+Security tools and monitoring services:
+
+- **Splunk** - Log analysis and monitoring
+- **Datadog** - Infrastructure monitoring
+- **PagerDuty** - Incident management
+- **Grafana** - Metrics and visualization
+- **Elastic Security** - Security analytics
+- **Okta** - Identity management
+
+## Node Architecture
+
+All n8n integrations follow a consistent architecture:
+
+<Tabs>
+  <Tab title="Declarative Nodes">
+    Declarative nodes use configuration-based routing without custom code:
+
+    ```typescript
+    {
+      displayName: 'Okta',
+      name: 'okta',
+      icon: 'file:okta.svg',
+      group: ['transform'],
+      description: 'Consume Okta API',
+      requestDefaults: {
+        baseURL: '={{$credentials.url}}/api/v1',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+      routing: {
+        request: {
+          method: 'GET',
+          url: '/users',
+        },
+      },
+    }
+    ```
+
+    **Best for:** REST API integrations with standard patterns
+  </Tab>
+
+  <Tab title="Programmatic Nodes">
+    Programmatic nodes implement custom logic in the execute function:
+
+    ```typescript
+    async execute(this: IExecuteFunctions) {
+      const items = this.getInputData();
+      const returnData: INodeExecutionData[] = [];
+      
+      for (let i = 0; i < items.length; i++) {
+        const operation = this.getNodeParameter('operation', i);
+        
+        if (operation === 'send') {
+          // Custom logic for sending messages
+          const message = this.getNodeParameter('message', i);
+          // API call and processing
+        }
+      }
+      
+      return [returnData];
+    }
+    ```
+
+    **Best for:** Complex operations, custom data processing
+  </Tab>
+
+  <Tab title="Versioned Nodes">
+    Versioned nodes support multiple API versions:
+
+    ```typescript
+    export class Slack extends VersionedNodeType {
+      constructor() {
+        const nodeVersions = {
+          1: new SlackV1(baseDescription),
+          2: new SlackV2(baseDescription),
+          2.4: new SlackV2(baseDescription),
+        };
+        super(nodeVersions, baseDescription);
+      }
+    }
+    ```
+
+    **Best for:** Maintaining backward compatibility
+  </Tab>
+</Tabs>
+
+## Finding the Right Integration
+
+### By Use Case
+
+<Accordion title="Data Synchronization">
+  Use **Google Sheets**, **Airtable**, **Notion**, or database nodes to sync data between systems. Combine with **Schedule Trigger** for periodic syncs.
+</Accordion>
+
+<Accordion title="Notification Workflows">
+  Use **Slack**, **Discord**, **Microsoft Teams**, or **Email Send** nodes with trigger nodes to create alert systems.
+</Accordion>
+
+<Accordion title="Lead Management">
+  Connect **HubSpot**, **Salesforce**, or **Pipedrive** with form submission triggers to automate lead capture and follow-up.
+</Accordion>
+
+<Accordion title="API Integration">
+  Use the **HTTP Request** node for custom APIs, or find a dedicated node for better authentication and error handling.
+</Accordion>
+
+<Accordion title="File Processing">
+  Use **Google Drive**, **Dropbox**, **AWS S3**, or **FTP** nodes with file manipulation nodes for automated file workflows.
+</Accordion>
+
+### By Authentication Type
+
+Different integrations support different authentication methods:
+
+- **OAuth2** - Google, Microsoft, Slack, GitHub, HubSpot
+- **API Key** - SendGrid, OpenAI, Stripe, Twilio
+- **Basic Auth** - Many REST APIs, LDAP, Jenkins
+- **JWT** - Custom enterprise APIs
+- **Database Credentials** - PostgreSQL, MySQL, MongoDB
+
+## Building Custom Integrations
+
+When a dedicated node doesn't exist:
+
+1. **HTTP Request Node** - For RESTful APIs
+2. **GraphQL Node** - For GraphQL endpoints
+3. **Code Node** - For complex custom logic (use as last resort)
+4. **Community Nodes** - Check npm for community-built integrations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Browse Popular Nodes" icon="fire" href="/integrations/popular-nodes">
+    Start with the most commonly used integrations
+  </Card>
+  <Card title="Understand Triggers" icon="play" href="/integrations/triggers">
+    Learn how to start workflows automatically
+  </Card>
+  <Card title="Explore Actions" icon="bolt" href="/integrations/actions">
+    Discover action nodes for data processing
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    View detailed API documentation
+  </Card>
+</CardGroup>
+
+## Integration Statistics
+
+- **500+ Total Nodes** across all categories
+- **50+ Database & Storage** integrations
+- **100+ SaaS Applications** supported
+- **25+ Authentication Methods** supported
+- **Active Development** - New nodes added regularly

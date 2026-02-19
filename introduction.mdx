@@ -1,0 +1,186 @@
+---
+title: Welcome to n8n
+description: Secure workflow automation for technical teams - Build powerful automations with 400+ integrations
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="n8n workflow automation"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="n8n workflow automation"
+/>
+
+# n8n - Secure Workflow Automation for Technical Teams
+
+n8n is a workflow automation platform that gives technical teams the flexibility of code with the speed of no-code. With 400+ integrations, native AI capabilities, and a fair-code license, n8n lets you build powerful automations while maintaining full control over your data and deployments.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get n8n running in under 5 minutes with npx or Docker
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Learn about different installation methods and deployment options
+  </Card>
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/core-concepts"
+  >
+    Understand nodes, workflows, triggers, and credentials
+  </Card>
+  <Card
+    title="Example Workflows"
+    icon="wand-magic-sparkles"
+    href="https://n8n.io/workflows"
+  >
+    Explore 900+ ready-to-use workflow templates
+  </Card>
+</CardGroup>
+
+## Key Capabilities
+
+### Code When You Need It
+
+Switch seamlessly between visual workflow building and code. Write JavaScript or Python, add npm packages, or use the intuitive drag-and-drop interface.
+
+```javascript
+// Execute custom JavaScript in Code nodes
+const items = $input.all();
+
+return items.map(item => ({
+  json: {
+    ...item.json,
+    processed: true,
+    timestamp: new Date().toISOString()
+  }
+}));
+```
+
+### AI-Native Platform
+
+Build AI agent workflows based on LangChain with your own data and models. n8n includes dedicated AI nodes and tools for creating intelligent automation.
+
+<Note>
+  n8n supports over 400+ integrations including OpenAI, Anthropic, Google AI, and local LLM deployments.
+</Note>
+
+### Full Control
+
+Self-host n8n anywhere with our fair-code license. Your data stays in your infrastructure, and you have complete control over your automations.
+
+<CardGroup cols={3}>
+  <Card title="Self-Hosted" icon="server">
+    Deploy on your own infrastructure with Docker, npm, or Kubernetes
+  </Card>
+  <Card title="Fair-Code License" icon="scale-balanced">
+    Source available, self-hostable, and extensible
+  </Card>
+  <Card title="Enterprise Ready" icon="building">
+    Advanced permissions, SSO, and air-gapped deployments
+  </Card>
+</CardGroup>
+
+## Why Choose n8n?
+
+### For Developers
+
+- **Version Control**: Workflows are JSON, perfect for Git
+- **Extensible**: Create custom nodes with TypeScript
+- **API-First**: Full REST API for programmatic control
+- **Local Development**: Run n8n locally with hot reload
+
+### For Teams
+
+- **Collaboration**: Share workflows and credentials securely
+- **Execution History**: Full audit trail of all workflow runs
+- **Error Handling**: Comprehensive error tracking and retry logic
+- **Scalable**: Queue mode for high-volume workloads
+
+### For Organizations
+
+- **Multi-Main Setup**: High availability with multiple instances
+- **SSO Integration**: Enterprise authentication support
+- **Role-Based Access**: Granular permissions control
+- **Compliance**: Self-hosted means full data sovereignty
+
+## What's Different About n8n?
+
+<Tip>
+  Unlike traditional automation tools, n8n is **fair-code** - the source code is always visible, you can self-host it anywhere, and you can extend it with custom functionality.
+</Tip>
+
+1. **Technical-First Design**: Built for developers who need the power of code with the speed of visual workflows
+2. **True Flexibility**: Run locally, on your servers, or in the cloud
+3. **Active Community**: 400+ integrations and 900+ workflow templates contributed by users
+4. **Transparent Pricing**: No hidden fees for self-hosted deployments
+
+## Getting Started
+
+Ready to build your first workflow? Choose your path:
+
+<Steps>
+  <Step title="Try Instantly">
+    Run `npx n8n` to start n8n without installation (requires Node.js 22.16+)
+  </Step>
+  <Step title="Learn the Basics">
+    Understand core concepts like nodes, triggers, and connections
+  </Step>
+  <Step title="Build Your First Workflow">
+    Follow our quickstart guide to create a working automation
+  </Step>
+  <Step title="Deploy to Production">
+    Choose your deployment method and configure for production use
+  </Step>
+</Steps>
+
+## Use Cases
+
+n8n powers automations across industries:
+
+- **Data Synchronization**: Keep systems in sync across SaaS platforms
+- **Customer Communication**: Automate email, SMS, and messaging workflows
+- **AI Agents**: Build intelligent assistants with LangChain integration
+- **DevOps Automation**: CI/CD pipelines, monitoring, and incident response
+- **Business Process Automation**: Invoice processing, lead routing, reporting
+- **ETL Pipelines**: Extract, transform, and load data between systems
+
+## Community & Support
+
+<CardGroup cols={2}>
+  <Card title="Community Forum" icon="comments" href="https://community.n8n.io">
+    Get support and connect with other n8n users
+  </Card>
+  <Card title="Documentation" icon="book" href="https://docs.n8n.io">
+    Comprehensive guides and API references
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/n8n-io/n8n">
+    Contribute, report issues, and view the source code
+  </Card>
+  <Card title="Community Tutorials" icon="graduation-cap" href="https://community.n8n.io/c/tutorials/28">
+    Learn from community-created tutorials and guides
+  </Card>
+</CardGroup>
+
+## What Does "n8n" Mean?
+
+**Short answer:** It means "nodemation" (node + automation) and is pronounced as **n-eight-n**.
+
+**Long answer:** While looking for a good name for the project, founder Jan Oberhauser realized all the good domain names were taken. He chose "nodemation" - 'node-' representing the Node-View interface and Node.js technology, and '-mation' for 'automation'. To make it shorter and easier to type in the CLI, he shortened it to 'n8n'.
+
+---
+
+<Note>
+  This documentation is for n8n version 2.9.0. The platform requires Node.js 22.16+ and uses a monorepo structure managed with pnpm workspaces.
+</Note>

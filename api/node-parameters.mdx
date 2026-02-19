@@ -1,0 +1,906 @@
+---
+title: Node Parameters
+description: Complete guide to defining and configuring node parameters in n8n
+---
+
+# Node Parameters
+
+This guide covers how to define node parameters, parameter types, and advanced configuration options.
+
+## INodeProperties Interface
+
+Node parameters are defined using the `INodeProperties` interface.
+
+```typescript Basic Parameter Structure
+interface INodeProperties {
+  displayName: string;           // Label shown in UI
+  name: string;                  // Internal parameter name
+  type: NodePropertyTypes;       // Parameter type
+  default: NodeParameterValueType; // Default value
+  description?: string;          // Help text
+  displayOptions?: IDisplayOptions; // Visibility conditions
+  required?: boolean;            // Whether parameter is required
+  typeOptions?: INodePropertyTypeOptions; // Type-specific options
+}
+```
+
+## Parameter Types
+
+### String
+
+Text input fields.
+
+<CodeGroup>
+```typescript Basic String
+{
+  displayName: 'Name',
+  name: 'name',
+  type: 'string',
+  default: '',
+  description: 'The name of the item',
+}
+```
+
+```typescript Multiline String
+{
+  displayName: 'Description',
+  name: 'description',
+  type: 'string',
+  typeOptions: {
+    rows: 4,
+  },
+  default: '',
+  description: 'Detailed description',
+}
+```
+
+```typescript Password String
+{
+  displayName: 'API Key',
+  name: 'apiKey',
+  type: 'string',
+  typeOptions: {
+    password: true,
+  },
+  default: '',
+  description: 'Your API key',
+}
+```
+
+```typescript Code Editor
+{
+  displayName: 'JavaScript Code',
+  name: 'code',
+  type: 'string',
+  typeOptions: {
+    editor: 'jsEditor',
+    rows: 10,
+  },
+  default: '',
+  description: 'JavaScript code to execute',
+}
+```
+</CodeGroup>
+
+### Number
+
+Numeric input fields.
+
+```typescript Number Parameter
+{
+  displayName: 'Limit',
+  name: 'limit',
+  type: 'number',
+  typeOptions: {
+    minValue: 1,
+    maxValue: 100,
+    numberPrecision: 0,
+  },
+  default: 50,
+  description: 'Maximum number of items to return',
+}
+```
+
+### Boolean
+
+Checkbox or toggle fields.
+
+```typescript Boolean Parameter
+{
+  displayName: 'Return All',
+  name: 'returnAll',
+  type: 'boolean',
+  default: false,
+  description: 'Whether to return all results or limit them',
+}
+```
+
+### Options
+
+Dropdown selection from static or dynamic list.
+
+<Tabs>
+  <Tab title="Static Options">
+    ```typescript Static Options
+    {
+      displayName: 'Operation',
+      name: 'operation',
+      type: 'options',
+      noDataExpression: true,
+      options: [
+        {
+          name: 'Get',
+          value: 'get',
+          description: 'Get a single item',
+          action: 'Get an item',
+        },
+        {
+          name: 'Get Many',
+          value: 'getMany',
+          description: 'Get multiple items',
+          action: 'Get many items',
+        },
+        {
+          name: 'Create',
+          value: 'create',
+          description: 'Create a new item',
+          action: 'Create an item',
+        },
+      ],
+      default: 'get',
+      description: 'The operation to perform',
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Dynamic Options">
+    ```typescript Dynamic Options
+    {
+      displayName: 'Project',
+      name: 'projectId',
+      type: 'options',
+      typeOptions: {
+        loadOptionsMethod: 'getProjects',
+      },
+      default: '',
+      description: 'The project to use',
+    }
+    ```
+    
+    Then implement the load method:
+    
+    ```typescript Load Options Method
+    methods = {
+      loadOptions: {
+        async getProjects(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+          const projects = await this.helpers.httpRequest({
+            method: 'GET',
+            url: 'https://api.example.com/projects',
+          });
+          
+          return projects.map((project: any) => ({
+            name: project.name,
+            value: project.id,
+          }));
+        },
+      },
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### MultiOptions
+
+Multi-select dropdown.
+
+```typescript MultiOptions Parameter
+{
+  displayName: 'Tags',
+  name: 'tags',
+  type: 'multiOptions',
+  options: [
+    { name: 'Important', value: 'important' },
+    { name: 'Urgent', value: 'urgent' },
+    { name: 'Review', value: 'review' },
+  ],
+  default: [],
+  description: 'Tags to apply',
+}
+```
+
+### Collection
+
+Key-value pair collection.
+
+```typescript Collection Parameter
+{
+  displayName: 'Additional Fields',
+  name: 'additionalFields',
+  type: 'collection',
+  placeholder: 'Add Field',
+  default: {},
+  options: [
+    {
+      displayName: 'Email',
+      name: 'email',
+      type: 'string',
+      default: '',
+      description: 'User email address',
+    },
+    {
+      displayName: 'Phone',
+      name: 'phone',
+      type: 'string',
+      default: '',
+      description: 'User phone number',
+    },
+    {
+      displayName: 'Department',
+      name: 'department',
+      type: 'options',
+      options: [
+        { name: 'Sales', value: 'sales' },
+        { name: 'Engineering', value: 'engineering' },
+        { name: 'Support', value: 'support' },
+      ],
+      default: 'sales',
+    },
+  ],
+}
+```
+
+### FixedCollection
+
+Structured collection with named groups.
+
+```typescript FixedCollection Parameter
+{
+  displayName: 'Headers',
+  name: 'headers',
+  type: 'fixedCollection',
+  typeOptions: {
+    multipleValues: true,
+  },
+  placeholder: 'Add Header',
+  default: {},
+  options: [
+    {
+      displayName: 'Header',
+      name: 'header',
+      values: [
+        {
+          displayName: 'Name',
+          name: 'name',
+          type: 'string',
+          default: '',
+          description: 'Header name',
+        },
+        {
+          displayName: 'Value',
+          name: 'value',
+          type: 'string',
+          default: '',
+          description: 'Header value',
+        },
+      ],
+    },
+  ],
+}
+```
+
+Access in execute:
+
+```typescript Accessing FixedCollection
+const headersData = this.getNodeParameter('headers', i) as IDataObject;
+const headers: IDataObject = {};
+
+if (headersData.header) {
+  const headerArray = headersData.header as Array<{ name: string; value: string }>;
+  for (const header of headerArray) {
+    headers[header.name] = header.value;
+  }
+}
+```
+
+### ResourceLocator
+
+Advanced parameter for selecting resources by ID, URL, or list.
+
+```typescript ResourceLocator Parameter
+{
+  displayName: 'User',
+  name: 'userId',
+  type: 'resourceLocator',
+  default: { mode: 'list', value: '' },
+  required: true,
+  description: 'The user to operate on',
+  modes: [
+    {
+      displayName: 'From List',
+      name: 'list',
+      type: 'list',
+      placeholder: 'Select a user...',
+      typeOptions: {
+        searchListMethod: 'searchUsers',
+        searchable: true,
+      },
+    },
+    {
+      displayName: 'By ID',
+      name: 'id',
+      type: 'string',
+      placeholder: 'user_12345',
+      validation: [
+        {
+          type: 'regex',
+          properties: {
+            regex: '^user_[a-zA-Z0-9]+$',
+            errorMessage: 'Must be a valid user ID (user_xxx)',
+          },
+        },
+      ],
+    },
+    {
+      displayName: 'By URL',
+      name: 'url',
+      type: 'string',
+      placeholder: 'https://example.com/users/12345',
+      extractValue: {
+        type: 'regex',
+        regex: 'https://example\\.com/users/(\\d+)',
+      },
+    },
+  ],
+}
+```
+
+Implement search method:
+
+```typescript List Search Method
+methods = {
+  listSearch: {
+    async searchUsers(
+      this: ILoadOptionsFunctions,
+      filter?: string,
+    ): Promise<INodeListSearchResult> {
+      const response = await this.helpers.httpRequest({
+        method: 'GET',
+        url: 'https://api.example.com/users',
+        qs: { search: filter },
+      });
+
+      return {
+        results: response.users.map((user: any) => ({
+          name: user.name,
+          value: user.id,
+          url: `https://example.com/users/${user.id}`,
+        })),
+      };
+    },
+  },
+};
+```
+
+### DateTime
+
+Date and time picker.
+
+```typescript DateTime Parameter
+{
+  displayName: 'Start Date',
+  name: 'startDate',
+  type: 'dateTime',
+  default: '',
+  description: 'When to start the process',
+}
+```
+
+### JSON
+
+JSON editor.
+
+```typescript JSON Parameter
+{
+  displayName: 'JSON Data',
+  name: 'jsonData',
+  type: 'json',
+  typeOptions: {
+    alwaysOpenEditWindow: true,
+  },
+  default: '{}',
+  description: 'JSON data to process',
+}
+```
+
+### Color
+
+Color picker.
+
+```typescript Color Parameter
+{
+  displayName: 'Tag Color',
+  name: 'color',
+  type: 'color',
+  typeOptions: {
+    showAlpha: true,
+  },
+  default: '#ff0000',
+  description: 'Color for the tag',
+}
+```
+
+### Hidden
+
+Hidden field (useful for credentials).
+
+```typescript Hidden Parameter
+{
+  displayName: 'OAuth Token',
+  name: 'oauthTokenData',
+  type: 'hidden',
+  typeOptions: {
+    expirable: true,
+  },
+  default: '',
+}
+```
+
+## Display Options
+
+Control parameter visibility based on other parameters.
+
+<CodeGroup>
+```typescript Show Condition
+{
+  displayName: 'User ID',
+  name: 'userId',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['user'],
+      operation: ['get'],
+    },
+  },
+  default: '',
+  description: 'ID of the user to retrieve',
+}
+```
+
+```typescript Hide Condition
+{
+  displayName: 'Simple Format',
+  name: 'simpleFormat',
+  type: 'boolean',
+  displayOptions: {
+    hide: {
+      returnAll: [true],
+    },
+  },
+  default: false,
+}
+```
+
+```typescript Advanced Conditions
+{
+  displayName: 'Filters',
+  name: 'filters',
+  type: 'collection',
+  displayOptions: {
+    show: {
+      resource: ['user', 'project'],
+      operation: ['getMany'],
+      '@version': [{ _cnd: { gte: 2 } }],
+    },
+  },
+  default: {},
+  options: [
+    // Filter options...
+  ],
+}
+```
+
+```typescript Version-Based Display
+{
+  displayName: 'Include Other Fields',
+  name: 'includeOtherFields',
+  type: 'boolean',
+  displayOptions: {
+    show: {
+      '@version': [3, 3.1, { _cnd: { gte: 3.2 } }],
+    },
+  },
+  default: false,
+}
+```
+</CodeGroup>
+
+## Advanced Type Options
+
+### Multiple Values
+
+Allow multiple instances of a parameter.
+
+```typescript Multiple Values
+{
+  displayName: 'Emails',
+  name: 'emails',
+  type: 'string',
+  typeOptions: {
+    multipleValues: true,
+    multipleValueButtonText: 'Add Email',
+    sortable: true,
+  },
+  default: [],
+  description: 'Email addresses to send to',
+}
+```
+
+### Load Options Dependencies
+
+Make options depend on other parameters.
+
+```typescript Dependent Options
+{
+  displayName: 'Repository',
+  name: 'repositoryId',
+  type: 'options',
+  typeOptions: {
+    loadOptionsMethod: 'getRepositories',
+    loadOptionsDependsOn: ['owner'],
+  },
+  default: '',
+  description: 'Select a repository',
+}
+```
+
+Implement dependent load:
+
+```typescript Dependent Load Method
+methods = {
+  loadOptions: {
+    async getRepositories(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+      const owner = this.getNodeParameter('owner') as string;
+      
+      if (!owner) {
+        return [];
+      }
+
+      const repos = await this.helpers.httpRequest({
+        method: 'GET',
+        url: `https://api.example.com/users/${owner}/repos`,
+      });
+
+      return repos.map((repo: any) => ({
+        name: repo.name,
+        value: repo.id,
+      }));
+    },
+  },
+};
+```
+
+### Code Autocomplete
+
+Provide autocomplete in code editors.
+
+```typescript Code Autocomplete
+{
+  displayName: 'Function',
+  name: 'functionCode',
+  type: 'string',
+  typeOptions: {
+    editor: 'jsEditor',
+    codeAutocomplete: 'functionItem',
+  },
+  default: '',
+  description: 'JavaScript function to execute',
+}
+```
+
+## Validation
+
+Validate parameter values.
+
+### Built-in Validation
+
+```typescript Type Validation
+{
+  displayName: 'Email',
+  name: 'email',
+  type: 'string',
+  validateType: 'string',
+  default: '',
+  description: 'Email address',
+}
+```
+
+### Regex Validation (ResourceLocator)
+
+```typescript Regex Validation
+{
+  displayName: 'User ID',
+  name: 'userId',
+  type: 'resourceLocator',
+  default: { mode: 'id', value: '' },
+  modes: [
+    {
+      displayName: 'ID',
+      name: 'id',
+      type: 'string',
+      validation: [
+        {
+          type: 'regex',
+          properties: {
+            regex: '^[0-9]{1,19}$',
+            errorMessage: 'Not a valid user ID',
+          },
+        },
+      ],
+    },
+  ],
+}
+```
+
+## Routing Configuration
+
+For declarative nodes, define HTTP routing.
+
+```typescript Routing Configuration
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  displayOptions: {
+    show: {
+      resource: ['user'],
+    },
+  },
+  options: [
+    {
+      name: 'Get',
+      value: 'get',
+      action: 'Get a user',
+      routing: {
+        request: {
+          method: 'GET',
+          url: '=/users/{{$parameter.userId}}',
+        },
+      },
+    },
+    {
+      name: 'Create',
+      value: 'create',
+      action: 'Create a user',
+      routing: {
+        request: {
+          method: 'POST',
+          url: '/users',
+          body: {
+            name: '={{$parameter.name}}',
+            email: '={{$parameter.email}}',
+          },
+        },
+        output: {
+          postReceive: [
+            {
+              type: 'rootProperty',
+              properties: {
+                property: 'user',
+              },
+            },
+          ],
+        },
+      },
+    },
+    {
+      name: 'Get Many',
+      value: 'getMany',
+      action: 'Get many users',
+      routing: {
+        request: {
+          method: 'GET',
+          url: '/users',
+          qs: {
+            limit: '={{$parameter.limit}}',
+            offset: '={{$parameter.offset}}',
+          },
+        },
+        operations: {
+          pagination: {
+            type: 'offset',
+            properties: {
+              limitParameter: 'limit',
+              offsetParameter: 'offset',
+              pageSize: 50,
+              type: 'query',
+            },
+          },
+        },
+      },
+    },
+  ],
+  default: 'get',
+}
+```
+
+## Special Parameter Types
+
+### Notice
+
+Display informational text.
+
+```typescript Notice Parameter
+{
+  displayName: 'Note: This will overwrite existing data',
+  name: 'overwriteNotice',
+  type: 'notice',
+  default: '',
+  displayOptions: {
+    show: {
+      mode: ['overwrite'],
+    },
+  },
+}
+```
+
+### Button
+
+Trigger custom actions.
+
+```typescript Button Parameter
+{
+  displayName: 'Generate Code',
+  name: 'generateButton',
+  type: 'button',
+  typeOptions: {
+    buttonConfig: {
+      label: 'Generate',
+      action: 'generateCode',
+    },
+  },
+  default: '',
+}
+```
+
+Handle button action:
+
+```typescript Button Action Handler
+methods = {
+  actionHandler: {
+    async generateCode(
+      this: ILoadOptionsFunctions,
+      payload: IDataObject,
+    ): Promise<string> {
+      // Generate code based on current parameters
+      const prompt = this.getNodeParameter('prompt') as string;
+      const generatedCode = await generateFromPrompt(prompt);
+      return generatedCode;
+    },
+  },
+};
+```
+
+### Filter
+
+Advanced filtering interface.
+
+```typescript Filter Parameter
+{
+  displayName: 'Filters',
+  name: 'filters',
+  type: 'filter',
+  typeOptions: {
+    version: 3,
+    caseSensitive: true,
+    allowedCombinators: ['and', 'or'],
+    maxConditions: 10,
+  },
+  default: {},
+  description: 'Filter conditions',
+}
+```
+
+### ResourceMapper
+
+Map input fields to service fields.
+
+```typescript ResourceMapper Parameter
+{
+  displayName: 'Field Mapping',
+  name: 'fieldMapping',
+  type: 'resourceMapper',
+  noDataExpression: true,
+  default: {
+    mappingMode: 'defineBelow',
+    value: null,
+  },
+  required: true,
+  typeOptions: {
+    resourceMapper: {
+      resourceMapperMethod: 'getUserFields',
+      mode: 'add',
+      valuesLabel: 'User Data',
+      supportAutoMap: true,
+    },
+  },
+}
+```
+
+Implement resource mapper method:
+
+```typescript Resource Mapper Method
+methods = {
+  resourceMapping: {
+    async getUserFields(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+      return {
+        fields: [
+          {
+            id: 'name',
+            displayName: 'Name',
+            required: true,
+            type: 'string',
+          },
+          {
+            id: 'email',
+            displayName: 'Email',
+            required: true,
+            type: 'string',
+            description: 'User email address',
+          },
+          {
+            id: 'role',
+            displayName: 'Role',
+            required: false,
+            type: 'options',
+            options: [
+              { name: 'Admin', value: 'admin' },
+              { name: 'User', value: 'user' },
+            ],
+          },
+        ],
+      };
+    },
+  },
+};
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Naming">
+    - Use clear, descriptive `displayName` values
+    - Use camelCase for parameter `name`
+    - Add helpful `description` text
+    - Use consistent naming across similar parameters
+  </Tab>
+  
+  <Tab title="UX">
+    - Set sensible default values
+    - Use `displayOptions` to show/hide parameters
+    - Group related parameters in collections
+    - Use `noDataExpression: true` for structural parameters
+    - Add `placeholder` text for guidance
+  </Tab>
+  
+  <Tab title="Validation">
+    - Mark critical parameters as `required`
+    - Add `validateType` for type checking
+    - Use regex validation for specific formats
+    - Provide clear error messages
+    - Handle edge cases gracefully
+  </Tab>
+  
+  <Tab title="Performance">
+    - Use `loadOptionsDependsOn` to avoid unnecessary loads
+    - Implement caching in load methods
+    - Use `listSearch` for large datasets
+    - Limit options to reasonable amounts
+  </Tab>
+</Tabs>
+
+## See Also
+
+- [Node Types](/api/node-types) - Node interfaces and structure
+- [Node Execution](/api/node-execution) - Accessing parameters during execution
+- [Credentials](/node-development/credentials) - Credential parameters

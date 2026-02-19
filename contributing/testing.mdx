@@ -1,0 +1,607 @@
+---
+title: Testing Practices
+description: Comprehensive guide to unit testing, integration testing, and E2E testing in the n8n monorepo
+---
+
+## Testing Overview
+
+n8n employs a comprehensive testing strategy with multiple layers:
+
+- **Unit Tests:** Jest for backend and nodes, Vitest for frontend
+- **Integration Tests:** Jest with mocked dependencies
+- **E2E Tests:** Playwright for full UI and API testing
+- **Workflow Tests:** JSON-based integration tests for nodes
+
+## Running Tests
+
+### All Tests
+
+Run all tests across the monorepo:
+
+```bash
+pnpm test
+```
+
+Run tests for affected packages only:
+
+```bash
+pnpm test:affected
+```
+
+### Package-Specific Tests
+
+Run tests for a specific package:
+
+<Steps>
+
+<Step title="Navigate to the package">
+```bash
+cd packages/cli
+```
+</Step>
+
+<Step title="Run the tests">
+```bash
+pnpm test
+```
+</Step>
+
+</Steps>
+
+<Warning>
+**Always run tests from within the package directory.** Running `pnpm test` from the monorepo root runs all tests, which can be time-consuming.
+</Warning>
+
+### Specific Test Files
+
+Run a specific test file:
+
+```bash
+cd packages/cli
+pnpm test src/services/workflow.service.test.ts
+```
+
+Run tests matching a pattern:
+
+```bash
+pnpm test -- --testPathPattern=workflow
+```
+
+## Unit Testing with Jest
+
+### Backend Unit Tests
+
+n8n uses Jest for backend unit tests with the following conventions:
+
+<CodeGroup>
+
+```typescript Example: Service Test
+// packages/cli/src/services/workflow.service.test.ts
+import { WorkflowService } from './workflow.service';
+import { WorkflowRepository } from '../repositories/workflow.repository';
+import { mock } from 'jest-mock-extended';
+
+describe('WorkflowService', () => {
+  let workflowService: WorkflowService;
+  let workflowRepository: jest.Mocked<WorkflowRepository>;
+
+  beforeEach(() => {
+    workflowRepository = mock<WorkflowRepository>();
+    workflowService = new WorkflowService(workflowRepository);
+  });
+
+  describe('findById', () => {
+    it('should return workflow when found', async () => {
+      const mockWorkflow = { id: '1', name: 'Test' };
+      workflowRepository.findById.mockResolvedValue(mockWorkflow);
+
+      const result = await workflowService.findById('1');
+
+      expect(result).toEqual(mockWorkflow);
+      expect(workflowRepository.findById).toHaveBeenCalledWith('1');
+    });
+
+    it('should throw error when workflow not found', async () => {
+      workflowRepository.findById.mockResolvedValue(null);
+
+      await expect(workflowService.findById('1'))
+        .rejects.toThrow('Workflow not found');
+    });
+  });
+});
+```
+
+```typescript Example: Node Test
+// packages/nodes-base/nodes/HttpRequest/HttpRequest.test.ts
+import { HttpRequest } from './HttpRequest.node';
+import type { IExecuteFunctions } from 'n8n-workflow';
+import { mock } from 'jest-mock-extended';
+
+describe('HttpRequest Node', () => {
+  let httpRequest: HttpRequest;
+  let executeFunctions: jest.Mocked<IExecuteFunctions>;
+
+  beforeEach(() => {
+    httpRequest = new HttpRequest();
+    executeFunctions = mock<IExecuteFunctions>();
+  });
+
+  it('should make GET request', async () => {
+    executeFunctions.getNodeParameter.mockReturnValue('https://api.example.com');
+    executeFunctions.helpers.request.mockResolvedValue({ data: 'success' });
+
+    const result = await httpRequest.execute.call(executeFunctions);
+
+    expect(result[0][0].json).toEqual({ data: 'success' });
+  });
+});
+```
+
+</CodeGroup>
+
+### Frontend Unit Tests
+
+Frontend tests use Vitest:
+
+```typescript
+// packages/frontend/editor-ui/src/stores/workflows.store.test.ts
+import { setActivePinia, createPinia } from 'pinia';
+import { useWorkflowsStore } from './workflows.store';
+import { vi } from 'vitest';
+
+describe('Workflows Store', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('should fetch workflows', async () => {
+    const store = useWorkflowsStore();
+    const mockWorkflows = [{ id: '1', name: 'Test' }];
+
+    // Mock API call
+    vi.spyOn(store, 'fetchWorkflows').mockResolvedValue(mockWorkflows);
+
+    await store.fetchWorkflows();
+
+    expect(store.workflows).toEqual(mockWorkflows);
+  });
+});
+```
+
+### Snapshot Updates
+
+If tests fail due to expected changes, update snapshots:
+
+```bash
+pnpm test -- -u
+```
+
+Or press `u` in Jest watch mode.
+
+## Code Coverage
+
+n8n tracks code coverage on [Codecov](https://app.codecov.io/gh/n8n-io/n8n).
+
+### Local Coverage
+
+Generate coverage reports locally:
+
+```bash
+COVERAGE_ENABLED=true pnpm test
+```
+
+View coverage in the `coverage/` folder or use the [VSCode Coverage Gutters extension](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters).
+
+## E2E Testing with Playwright
+
+n8n uses [Playwright](https://playwright.dev) for comprehensive E2E testing.
+
+### Running E2E Tests
+
+<CodeGroup>
+
+```bash Local Mode
+# Run tests against local server
+pnpm --filter=n8n-playwright test:local
+```
+
+```bash Container Mode
+# Run tests in containers (requires pnpm build:docker first)
+pnpm --filter=n8n-playwright test:container:sqlite
+pnpm --filter=n8n-playwright test:container:postgres
+pnpm --filter=n8n-playwright test:container:queue
+```
+
+```bash Interactive Mode
+# Run with Playwright UI for debugging
+pnpm --filter=n8n-playwright test:local --ui
+```
+
+```bash Specific Tests
+# Run tests matching pattern
+pnpm --filter=n8n-playwright test:local --grep="workflow"
+```
+
+</CodeGroup>
+
+### Test Architecture
+
+Playwright tests follow a layered architecture:
+
+```
+Tests (*.spec.ts)
+    ↓ uses
+Composables (*Composer.ts) - Business workflows
+    ↓ orchestrates
+Page Objects (*Page.ts) - UI interactions
+    ↓ extends
+BasePage - Common utilities
+```
+
+### Page Object Pattern
+
+Page objects encapsulate UI interactions:
+
+```typescript
+// packages/testing/playwright/pages/WorkflowsPage.ts
+import { BasePage } from './BasePage';
+import type { Locator } from '@playwright/test';
+
+export class WorkflowsPage extends BasePage {
+  // Getters: Return Locator, no async
+  getWorkflowCards(): Locator {
+    return this.page.getByTestId('workflow-card');
+  }
+
+  getWorkflowByName(name: string): Locator {
+    return this.getWorkflowCards().filter({ hasText: name });
+  }
+
+  // Actions: Async, descriptive verb, returns void
+  async clickAddWorkflowButton(): Promise<void> {
+    await this.page.getByTestId('add-workflow').click();
+  }
+
+  async searchWorkflows(searchTerm: string): Promise<void> {
+    await this.page.getByTestId('search-input').fill(searchTerm);
+  }
+
+  // Queries: Async, returns data
+  async getWorkflowCount(): Promise<number> {
+    return await this.getWorkflowCards().count();
+  }
+}
+```
+
+### Composables
+
+Composables orchestrate multi-step business workflows:
+
+```typescript
+// packages/testing/playwright/composables/WorkflowComposer.ts
+export class WorkflowComposer {
+  constructor(private n8n: N8nFixture) {}
+
+  async createWorkflow(name?: string) {
+    await this.n8n.workflows.clickAddWorkflowButton();
+    const workflowName = name ?? `Workflow ${Date.now()}`;
+    await this.n8n.canvas.setWorkflowName(workflowName);
+    await this.n8n.canvas.saveWorkflow();
+    return workflowName;
+  }
+
+  async executeWorkflowAndWaitForSuccess() {
+    const responsePromise = this.n8n.page.waitForResponse(
+      (response) => response.url().includes('/run') &&
+                    response.request().method() === 'POST'
+    );
+    await this.n8n.canvas.clickExecuteButton();
+    await responsePromise;
+    await this.n8n.notifications.waitForNotificationAndClose('Successful');
+  }
+}
+```
+
+### Writing E2E Tests
+
+```typescript
+// packages/testing/playwright/tests/workflows/create.spec.ts
+import { test, expect } from '../fixtures/base';
+
+test('should create a new workflow', async ({ n8n }) => {
+  // Use entry point
+  await n8n.start.fromHome();
+
+  // Use composables for complex workflows
+  const workflowName = await n8n.workflowComposer.createWorkflow();
+
+  // Use page objects for assertions
+  await expect(n8n.workflows.getWorkflowByName(workflowName)).toBeVisible();
+});
+
+test('should execute workflow successfully', async ({ n8n }) => {
+  await n8n.start.fromBlankCanvas();
+
+  // Use page objects for simple interactions
+  await n8n.canvas.addNode('Manual Trigger');
+  await n8n.canvas.addNode('Set');
+
+  // Use composables for complex flows
+  await n8n.workflowComposer.executeWorkflowAndWaitForSuccess();
+});
+```
+
+### Test Tags
+
+Use tags to control test execution:
+
+```typescript
+// Basic test - runs in all modes
+test('basic workflow creation', async ({ n8n }) => {
+  // Test code
+});
+
+// PostgreSQL only
+test('postgres-specific feature @mode:postgres', async ({ n8n }) => {
+  // Test code
+});
+
+// Enterprise features (container-only)
+test('log streaming @licensed', async ({ n8n }) => {
+  // Test code
+});
+
+// Requires specific capability
+test('email notification @capability:email', async ({ n8n }) => {
+  // Test code
+});
+```
+
+| Tag | Purpose |
+|-----|--------|
+| `@mode:postgres` | Requires PostgreSQL database |
+| `@mode:queue` | Requires queue mode |
+| `@mode:multi-main` | Requires multi-main setup |
+| `@licensed` | Requires enterprise license |
+| `@capability:email` | Requires email server |
+| `@capability:proxy` | Requires proxy server |
+| `@db:reset` | Reset database before each test |
+
+### Test Isolation
+
+For tests requiring isolated databases:
+
+```typescript
+import { test, expect } from '../fixtures/base';
+
+// Unique capability value gives fresh container
+test.use({ capability: { env: { TEST_ISOLATION: 'my-test-suite' } } });
+
+test.describe('Isolated tests', () => {
+  test.describe.configure({ mode: 'serial' }); // If tests depend on each other
+
+  test('test with clean state', async ({ n8n }) => {
+    // Fresh container with reset database
+  });
+});
+```
+
+For per-test database reset:
+
+```typescript
+test.use({ capability: { env: { TEST_ISOLATION: 'stateful-tests' } } });
+
+test.describe('Stateful tests @db:reset', () => {
+  test('test 1', async ({ n8n }) => {
+    // Fresh database before this test
+  });
+
+  test('test 2', async ({ n8n }) => {
+    // Fresh database again
+  });
+});
+```
+
+<Note>
+Tests with `@db:reset` only run in container mode, not locally.
+</Note>
+
+## Node Workflow Tests
+
+Nodes include JSON-based workflow tests:
+
+```json
+// packages/nodes-base/nodes/Switch/V3/test/node/workflow.json
+{
+  "nodes": [
+    {
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [250, 300]
+    },
+    {
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "number": [
+                  {
+                    "value1": "={{ $json.value }}",
+                    "operation": "larger",
+                    "value2": 5
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [[{ "node": "Switch", "type": "main", "index": 0 }]]
+    }
+  }
+}
+```
+
+Tests verify node behavior with real workflow execution.
+
+## Mocking Dependencies
+
+### Server Mocking with nock
+
+Backend tests use `nock` for HTTP mocking:
+
+```typescript
+import nock from 'nock';
+
+test('should fetch external API', async () => {
+  nock('https://api.example.com')
+    .get('/data')
+    .reply(200, { result: 'success' });
+
+  const result = await fetchData();
+  expect(result).toEqual({ result: 'success' });
+});
+```
+
+### Playwright Proxy Server
+
+E2E tests can use proxy server for API mocking:
+
+```typescript
+import { test, expect } from '../fixtures/base';
+
+test.describe('Proxy tests @capability:proxy', () => {
+  test('should mock HTTP requests', async ({ proxyServer, n8n }) => {
+    // Create mock expectation
+    await proxyServer.createGetExpectation('/api/data', { result: 'mocked' });
+
+    // Execute workflow that makes HTTP requests
+    await n8n.canvas.openNewWorkflow();
+    await n8n.canvas.addNode('HTTP Request');
+    await n8n.ndv.fillParameterInput('URL', 'https://api.example.com/data');
+    await n8n.workflowComposer.executeWorkflowAndWaitForSuccess();
+
+    // Verify request was proxied
+    expect(await proxyServer.wasGetRequestMade('/api/data')).toBe(true);
+  });
+});
+```
+
+## Testing Best Practices
+
+<Note>
+**Mock all external dependencies** in unit tests. Never make real HTTP requests or database calls.
+</Note>
+
+<Note>
+**Confirm test cases with the team** before writing complex unit tests for new features.
+</Note>
+
+<Note>
+**Always run typecheck** before committing:
+
+```bash
+cd packages/cli
+pnpm typecheck
+```
+</Note>
+
+<Warning>
+**Use unique identifiers** in E2E tests to avoid conflicts:
+
+```typescript
+import { nanoid } from 'nanoid';
+
+const workflowName = `Test Workflow ${nanoid()}`;
+```
+</Warning>
+
+<Warning>
+**Never use `waitForTimeout`** - use proper Playwright waiting strategies:
+
+```typescript
+// Bad
+await page.waitForTimeout(1000);
+
+// Good
+await page.waitForResponse('**/api/workflows/**');
+await expect(element).toBeVisible();
+```
+</Warning>
+
+## Debugging Tests
+
+### Playwright Debugging
+
+<CodeGroup>
+
+```typescript Pause Execution
+test('debug test', async ({ n8n }) => {
+  await n8n.page.pause(); // Opens Playwright inspector
+});
+```
+
+```bash Interactive UI
+pnpm --filter=n8n-playwright test:local --ui
+```
+
+```bash Keepalive Mode
+N8N_CONTAINERS_KEEPALIVE=true pnpm --filter=n8n-playwright test:container:sqlite
+```
+
+</CodeGroup>
+
+### Jest Debugging
+
+```bash
+# Run specific test in debug mode
+node --inspect-brk node_modules/.bin/jest --runInBand src/services/workflow.service.test.ts
+```
+
+Then attach your debugger (VS Code, Chrome DevTools, etc.)
+
+## CI/CD Testing
+
+Tests run automatically on CI:
+
+```bash
+# Backend tests
+pnpm test:ci:backend
+
+# Frontend tests
+pnpm test:ci:frontend
+
+# E2E tests
+pnpm test:with:docker
+```
+
+## Test Maintenance
+
+The `janitor` tool helps maintain test quality:
+
+```bash
+# Run static analysis
+npx tsx scripts/janitor/index.ts
+
+# Find dead code
+npx tsx scripts/janitor/index.ts --rule=dead-code
+
+# Auto-fix issues
+npx tsx scripts/janitor/index.ts --rule=dead-code --fix --write
+```
+
+See `packages/testing/playwright/README.md` for more details.
+
+## Next Steps
+
+- Review [contribution guidelines](/contributing/guidelines)
+- Learn about [development setup](/contributing/setup)
+- Explore [architecture overview](/contributing/architecture)

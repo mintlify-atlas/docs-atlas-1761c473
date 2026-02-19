@@ -1,0 +1,751 @@
+---
+title: Node Execution
+description: Understanding execution contexts, helpers, and runtime behavior in n8n nodes
+---
+
+# Node Execution
+
+This guide covers the execution contexts and helper functions available to nodes during runtime.
+
+## Execution Contexts
+
+Different node operations have access to different execution contexts, each providing specific capabilities.
+
+### IExecuteFunctions
+
+The primary execution context for programmatic nodes.
+
+<CodeGroup>
+```typescript Basic Execute Function
+export class MyNode implements INodeType {
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const returnData: INodeExecutionData[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const resource = this.getNodeParameter('resource', i) as string;
+      const operation = this.getNodeParameter('operation', i) as string;
+
+      if (resource === 'user') {
+        if (operation === 'get') {
+          const userId = this.getNodeParameter('userId', i) as string;
+          
+          const responseData = await this.helpers.httpRequest({
+            method: 'GET',
+            url: `https://api.example.com/users/${userId}`,
+          });
+
+          returnData.push({
+            json: responseData,
+            pairedItem: { item: i },
+          });
+        }
+      }
+    }
+
+    return [returnData];
+  }
+}
+```
+
+```typescript With Binary Data
+async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+  const items = this.getInputData();
+  const returnData: INodeExecutionData[] = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const fileUrl = this.getNodeParameter('fileUrl', i) as string;
+
+    const response = await this.helpers.httpRequest({
+      method: 'GET',
+      url: fileUrl,
+      encoding: 'arraybuffer',
+    });
+
+    const binaryData = await this.helpers.prepareBinaryData(
+      Buffer.from(response),
+      'downloaded-file.pdf',
+      'application/pdf',
+    );
+
+    returnData.push({
+      json: { filename: 'downloaded-file.pdf' },
+      binary: { data: binaryData },
+      pairedItem: { item: i },
+    });
+  }
+
+  return [returnData];
+}
+```
+</CodeGroup>
+
+#### Core Methods
+
+<ParamField path="getInputData" type="function" required>
+  Get input data from the previous node
+  
+  ```typescript
+  getInputData(inputIndex?: number, connectionType?: NodeConnectionType): INodeExecutionData[]
+  ```
+</ParamField>
+
+<ParamField path="getNodeParameter" type="function" required>
+  Get parameter value for a specific item
+  
+  ```typescript
+  getNodeParameter(
+    parameterName: string,
+    itemIndex: number,
+    fallbackValue?: any,
+    options?: IGetNodeParameterOptions,
+  ): NodeParameterValueType | object
+  ```
+</ParamField>
+
+<ParamField path="getNode" type="function">
+  Get the current node object
+  
+  ```typescript
+  getNode(): INode
+  ```
+</ParamField>
+
+<ParamField path="getWorkflow" type="function">
+  Get workflow metadata
+  
+  ```typescript
+  getWorkflow(): IWorkflowMetadata
+  ```
+</ParamField>
+
+<ParamField path="getWorkflowStaticData" type="function">
+  Get/set persistent workflow data
+  
+  ```typescript
+  getWorkflowStaticData(type: 'workflow' | 'node'): IDataObject
+  ```
+</ParamField>
+
+<ParamField path="getCredentials" type="function">
+  Get decrypted credentials
+  
+  ```typescript
+  getCredentials<T = ICredentialDataDecryptedObject>(
+    type: string,
+    itemIndex?: number,
+  ): Promise<T>
+  ```
+</ParamField>
+
+<ParamField path="getExecutionId" type="function">
+  Get the current execution ID
+  
+  ```typescript
+  getExecutionId(): string
+  ```
+</ParamField>
+
+<ParamField path="getMode" type="function">
+  Get execution mode (manual, trigger, webhook, etc.)
+  
+  ```typescript
+  getMode(): WorkflowExecuteMode
+  ```
+</ParamField>
+
+#### Advanced Methods
+
+<ParamField path="continueOnFail" type="function">
+  Check if node should continue on error
+  
+  ```typescript
+  continueOnFail(): boolean
+  ```
+</ParamField>
+
+<ParamField path="evaluateExpression" type="function">
+  Evaluate an n8n expression
+  
+  ```typescript
+  evaluateExpression(expression: string, itemIndex: number): NodeParameterValueType
+  ```
+</ParamField>
+
+<ParamField path="getContext" type="function">
+  Get/set context data
+  
+  ```typescript
+  getContext(type: 'flow' | 'node'): IContextObject
+  ```
+</ParamField>
+
+<ParamField path="putExecutionToWait" type="function">
+  Pause execution until specified time
+  
+  ```typescript
+  putExecutionToWait(waitTill: Date): Promise<void>
+  ```
+</ParamField>
+
+<ParamField path="sendMessageToUI" type="function">
+  Send message to the UI
+  
+  ```typescript
+  sendMessageToUI(message: any): void
+  ```
+</ParamField>
+
+<ParamField path="executeWorkflow" type="function">
+  Execute another workflow
+  
+  ```typescript
+  executeWorkflow(
+    workflowInfo: IExecuteWorkflowInfo,
+    inputData?: INodeExecutionData[],
+  ): Promise<ExecuteWorkflowData>
+  ```
+</ParamField>
+
+### ITriggerFunctions
+
+Execution context for trigger nodes.
+
+```typescript Trigger Function Implementation
+export class MyTrigger implements INodeType {
+  async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
+    const webhookUrl = this.getNodeWebhookUrl('default');
+    const pollInterval = this.getNodeParameter('pollInterval') as number;
+
+    const interval = setInterval(async () => {
+      try {
+        const data = await this.helpers.httpRequest({
+          method: 'GET',
+          url: 'https://api.example.com/events',
+        });
+
+        if (data.length > 0) {
+          this.emit([
+            data.map((item: any) => ({
+              json: item,
+            })),
+          ]);
+        }
+      } catch (error) {
+        this.emitError(error as Error);
+      }
+    }, pollInterval * 1000);
+
+    async function closeFunction() {
+      clearInterval(interval);
+    }
+
+    return {
+      closeFunction,
+    };
+  }
+}
+```
+
+<ParamField path="emit" type="function" required>
+  Emit data to start workflow execution
+  
+  ```typescript
+  emit(data: INodeExecutionData[][]): void
+  ```
+</ParamField>
+
+<ParamField path="emitError" type="function">
+  Report fatal trigger error and deactivate workflow
+  
+  ```typescript
+  emitError(error: Error): void
+  ```
+</ParamField>
+
+<ParamField path="saveFailedExecution" type="function">
+  Persist failed execution but keep trigger active
+  
+  ```typescript
+  saveFailedExecution(error: ExecutionError): void
+  ```
+</ParamField>
+
+<ParamField path="getActivationMode" type="function">
+  Get how the workflow was activated
+  
+  ```typescript
+  getActivationMode(): WorkflowActivateMode
+  ```
+</ParamField>
+
+### IPollFunctions
+
+Execution context for polling trigger nodes.
+
+```typescript Poll Function Implementation
+export class MyPollingTrigger implements INodeType {
+  async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+    const staticData = this.getWorkflowStaticData('node');
+    const lastTimestamp = staticData.lastTimestamp as number || 0;
+
+    const data = await this.helpers.httpRequest({
+      method: 'GET',
+      url: 'https://api.example.com/items',
+      qs: { since: lastTimestamp },
+    });
+
+    if (data.length === 0) {
+      return null; // No new data
+    }
+
+    // Update state
+    staticData.lastTimestamp = Date.now();
+
+    return [
+      data.map((item: any) => ({
+        json: item,
+      })),
+    ];
+  }
+}
+```
+
+### IWebhookFunctions
+
+Execution context for webhook nodes.
+
+```typescript Webhook Function Implementation
+export class MyWebhook implements INodeType {
+  async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+    const bodyData = this.getBodyData();
+    const headerData = this.getHeaderData();
+    const queryData = this.getQueryData();
+    const req = this.getRequestObject();
+    const res = this.getResponseObject();
+
+    // Process webhook data
+    const processedData = {
+      body: bodyData,
+      headers: headerData,
+      query: queryData,
+    };
+
+    return {
+      workflowData: [[
+        {
+          json: processedData,
+        },
+      ]],
+    };
+  }
+}
+```
+
+<ParamField path="getBodyData" type="function">
+  Get request body data
+  
+  ```typescript
+  getBodyData(): IDataObject
+  ```
+</ParamField>
+
+<ParamField path="getHeaderData" type="function">
+  Get request headers
+  
+  ```typescript
+  getHeaderData(): IncomingHttpHeaders
+  ```
+</ParamField>
+
+<ParamField path="getQueryData" type="function">
+  Get query parameters
+  
+  ```typescript
+  getQueryData(): object
+  ```
+</ParamField>
+
+<ParamField path="getRequestObject" type="function">
+  Get Express request object
+  
+  ```typescript
+  getRequestObject(): express.Request
+  ```
+</ParamField>
+
+<ParamField path="getResponseObject" type="function">
+  Get Express response object
+  
+  ```typescript
+  getResponseObject(): express.Response
+  ```
+</ParamField>
+
+### ILoadOptionsFunctions
+
+Context for loading dynamic options.
+
+```typescript Load Options Context
+methods = {
+  loadOptions: {
+    async getProjects(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+      const credentials = await this.getCredentials('myApi');
+      const workflowId = this.getWorkflow().id;
+      
+      const response = await this.helpers.httpRequest({
+        method: 'GET',
+        url: `${credentials.baseUrl}/projects`,
+        headers: {
+          'Authorization': `Bearer ${credentials.apiKey}`,
+        },
+      });
+
+      return response.projects.map((project: any) => ({
+        name: project.name,
+        value: project.id,
+        description: project.description,
+      }));
+    },
+  },
+};
+```
+
+## Helper Functions
+
+All execution contexts provide a `helpers` object with utility functions.
+
+### HTTP Requests
+
+<Tabs>
+  <Tab title="httpRequest">
+    ```typescript HTTP Request
+    const response = await this.helpers.httpRequest({
+      method: 'POST',
+      url: 'https://api.example.com/data',
+      body: {
+        name: 'John Doe',
+        email: 'john@example.com',
+      },
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    ```
+  </Tab>
+  
+  <Tab title="httpRequestWithAuthentication">
+    ```typescript Authenticated Request
+    const response = await this.helpers.httpRequestWithAuthentication(
+      'myApiCredentials',
+      {
+        method: 'GET',
+        url: 'https://api.example.com/protected',
+      },
+    );
+    ```
+  </Tab>
+  
+  <Tab title="requestWithAuthenticationPaginated">
+    ```typescript Paginated Request
+    const allResults = await this.helpers.requestWithAuthenticationPaginated(
+      {
+        method: 'GET',
+        url: 'https://api.example.com/items',
+      },
+      0,
+      {
+        continue: '={{$response.body.hasMore}}',
+        request: {
+          qs: {
+            page: '={{$response.body.nextPage}}',
+          },
+        },
+        requestInterval: 100,
+      },
+      'myApiCredentials',
+    );
+    ```
+  </Tab>
+</Tabs>
+
+### Binary Data
+
+<CodeGroup>
+```typescript Prepare Binary Data
+const buffer = Buffer.from('Hello World');
+const binaryData = await this.helpers.prepareBinaryData(
+  buffer,
+  'output.txt',
+  'text/plain',
+);
+
+returnData.push({
+  json: {},
+  binary: {
+    data: binaryData,
+  },
+});
+```
+
+```typescript Get Binary Data Buffer
+const items = this.getInputData();
+const binaryPropertyName = this.getNodeParameter('binaryPropertyName', 0) as string;
+
+for (let i = 0; i < items.length; i++) {
+  const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+  const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+  
+  // Process buffer...
+}
+```
+
+```typescript Binary to String
+const buffer = await this.helpers.getBinaryDataBuffer(0, 'data');
+const content = await this.helpers.binaryToString(buffer, 'utf-8');
+```
+</CodeGroup>
+
+### Data Transformation
+
+<ParamField path="returnJsonArray" type="function">
+  Convert objects to node execution data array
+  
+  ```typescript
+  const data = { name: 'John', age: 30 };
+  const items = this.helpers.returnJsonArray(data);
+  // Returns: [{ json: { name: 'John', age: 30 } }]
+  ```
+</ParamField>
+
+<ParamField path="normalizeItems" type="function">
+  Normalize data to execution format
+  
+  ```typescript
+  const normalized = this.helpers.normalizeItems(
+    items,
+  );
+  ```
+</ParamField>
+
+<ParamField path="constructExecutionMetaData" type="function">
+  Add pairedItem metadata to results
+  
+  ```typescript
+  const results = this.helpers.constructExecutionMetaData(
+    items,
+    { itemData: { item: i } },
+  );
+  ```
+</ParamField>
+
+### Deduplication
+
+Prevent processing duplicate items in polling triggers.
+
+```typescript Deduplication Helpers
+async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+  const items = await fetchNewItems();
+  
+  // Check for and mark processed items
+  const { new: newItems } = await this.helpers.checkProcessedAndRecord(
+    items.map((item) => item.id),
+    'node',
+    {
+      mode: 'latestIncrementalKey',
+      maxEntries: 1000,
+    },
+  );
+
+  if (newItems.length === 0) {
+    return null;
+  }
+
+  return [
+    items
+      .filter((item) => newItems.includes(item.id))
+      .map((item) => ({ json: item })),
+  ];
+}
+```
+
+### File System
+
+<CodeGroup>
+```typescript Resolve Path
+const filePath = this.getNodeParameter('filePath', 0) as string;
+const resolvedPath = await this.helpers.resolvePath(filePath);
+
+if (this.helpers.isFilePathBlocked(resolvedPath)) {
+  throw new NodeOperationError(
+    this.getNode(),
+    'Access to this path is not allowed',
+  );
+}
+```
+
+```typescript Read File
+const resolvedPath = await this.helpers.resolvePath('./data.txt');
+const stream = await this.helpers.createReadStream(resolvedPath);
+```
+
+```typescript Write File
+const resolvedPath = await this.helpers.resolvePath('./output.txt');
+const content = 'Hello World';
+
+await this.helpers.writeContentToFile(
+  resolvedPath,
+  content,
+);
+```
+</CodeGroup>
+
+## Node Execution Data
+
+The standard data format passed between nodes.
+
+```typescript INodeExecutionData Structure
+interface INodeExecutionData {
+  json: IDataObject;           // Main JSON data
+  binary?: IBinaryKeyData;     // Binary data by key
+  pairedItem?: IPairedItemData | IPairedItemData[] | number;
+  error?: NodeApiError | NodeOperationError;
+  metadata?: {
+    subExecution: RelatedExecution;
+  };
+}
+```
+
+### Working with Items
+
+```typescript Processing Items
+async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+  const items = this.getInputData();
+  const returnData: INodeExecutionData[] = [];
+
+  for (let i = 0; i < items.length; i++) {
+    try {
+      const inputItem = items[i];
+      
+      // Access JSON data
+      const userId = inputItem.json.userId as string;
+      
+      // Access binary data
+      const binaryData = inputItem.binary?.data;
+
+      // Process and create output
+      const result = await processData(userId);
+
+      returnData.push({
+        json: result,
+        pairedItem: { item: i }, // Track source item
+      });
+    } catch (error) {
+      if (this.continueOnFail()) {
+        returnData.push({
+          json: { error: error.message },
+          pairedItem: { item: i },
+        });
+        continue;
+      }
+      throw new NodeOperationError(this.getNode(), error, { itemIndex: i });
+    }
+  }
+
+  return [returnData];
+}
+```
+
+## Error Handling
+
+<CodeGroup>
+```typescript NodeOperationError
+import { NodeOperationError } from 'n8n-workflow';
+
+if (!userId) {
+  throw new NodeOperationError(
+    this.getNode(),
+    'User ID is required',
+    { itemIndex: i },
+  );
+}
+```
+
+```typescript NodeApiError
+import { NodeApiError } from 'n8n-workflow';
+
+try {
+  const response = await this.helpers.httpRequest({
+    method: 'GET',
+    url: `https://api.example.com/user/${userId}`,
+  });
+} catch (error) {
+  throw new NodeApiError(
+    this.getNode(),
+    error,
+    { itemIndex: i },
+  );
+}
+```
+
+```typescript Continue on Fail
+for (let i = 0; i < items.length; i++) {
+  try {
+    // Process item
+    const result = await processItem(items[i]);
+    returnData.push({ json: result, pairedItem: { item: i } });
+  } catch (error) {
+    if (this.continueOnFail()) {
+      returnData.push({
+        json: { error: error.message },
+        pairedItem: { item: i },
+        error: error,
+      });
+      continue;
+    }
+    throw error;
+  }
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Performance">
+    - Process items in batches when possible
+    - Use streaming for large files
+    - Cache expensive operations
+    - Implement proper pagination
+    - Limit concurrent API requests
+  </Tab>
+  
+  <Tab title="State Management">
+    - Use `getWorkflowStaticData('node')` for node-specific state
+    - Use `getWorkflowStaticData('workflow')` for workflow-wide state
+    - Always check state exists before accessing
+    - Clean up state when no longer needed
+  </Tab>
+  
+  <Tab title="Error Handling">
+    - Always provide helpful error messages
+    - Include `itemIndex` in errors for debugging
+    - Support `continueOnFail` when appropriate
+    - Use specific error types (NodeOperationError, NodeApiError)
+    - Handle edge cases gracefully
+  </Tab>
+  
+  <Tab title="Data Flow">
+    - Always set `pairedItem` to track data lineage
+    - Preserve binary data when not modifying
+    - Use `constructExecutionMetaData` for batch operations
+    - Validate input data structure
+    - Return appropriate output format
+  </Tab>
+</Tabs>
+
+## See Also
+
+- [Node Types](/api/node-types) - Node interfaces and implementation
+- [Node Parameters](/api/node-parameters) - Parameter configuration
+- [Credentials](/node-development/credentials) - Working with credentials

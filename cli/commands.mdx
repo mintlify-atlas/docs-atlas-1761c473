@@ -1,0 +1,308 @@
+---
+title: CLI Commands
+description: Complete reference of all n8n CLI commands for starting services, executing workflows, and managing your instance
+---
+
+The n8n CLI provides a comprehensive set of commands for managing your n8n instance. Access the CLI through the `n8n` command in your terminal.
+
+## Getting Help
+
+To see available commands:
+
+```bash
+n8n --help
+```
+
+To check your n8n version:
+
+```bash
+n8n --version
+# or
+n8n -v
+```
+
+## Main Commands
+
+### start
+
+Starts the n8n server with Web UI and activates all workflows.
+
+```bash
+n8n start
+```
+
+<ParamField path="--open" type="boolean" default="false">
+  Automatically opens the n8n UI in your default browser after startup.
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Basic Start
+n8n start
+```
+
+```bash Auto-open Browser
+n8n start --open
+# or
+n8n start -o
+```
+</CodeGroup>
+
+<Note>
+The start command initializes the full n8n server including:
+- Web UI (Editor)
+- Workflow execution engine
+- Active workflow triggers
+- Webhook endpoints
+- REST API
+</Note>
+
+### worker
+
+Starts an n8n worker process for queue mode execution. Workers handle workflow executions from the queue.
+
+```bash
+n8n worker
+```
+
+<ParamField path="--concurrency" type="number" default="10">
+  Number of jobs that can run in parallel on this worker.
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Default Worker
+n8n worker
+```
+
+```bash Custom Concurrency
+n8n worker --concurrency=5
+```
+
+```bash High Concurrency
+n8n worker --concurrency=20
+```
+</CodeGroup>
+
+<Note>
+  **Important:** Concurrency less than 5 can lead to an unstable environment. Consider setting it to at least 5 for best performance.
+</Note>
+
+**Environment Variables:**
+
+- `N8N_CONCURRENCY_PRODUCTION_LIMIT`: Overrides the `--concurrency` flag if set to a value other than -1
+- `QUEUE_WORKER_TIMEOUT`: Graceful shutdown timeout (deprecated, use `N8N_GRACEFUL_SHUTDOWN_TIMEOUT`)
+
+### webhook
+
+Starts a dedicated webhook process that intercepts production webhook URLs. Useful for scaling webhook handling separately.
+
+```bash
+n8n webhook
+```
+
+<Note>
+  **Queue Mode Required:** The webhook command only works when execution mode is set to `queue`. It cannot run in regular execution mode.
+</Note>
+
+**Use Cases:**
+- Separate webhook handling from main process
+- Scale webhook endpoints independently
+- Improve reliability for high-traffic webhooks
+
+### execute
+
+Executes a specific workflow once from the command line.
+
+```bash
+n8n execute --id=WORKFLOW_ID
+```
+
+<ParamField path="--id" type="string" required>
+  The ID of the workflow to execute.
+</ParamField>
+
+<ParamField path="--rawOutput" type="boolean" default="false">
+  Outputs only JSON data with no additional text.
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Execute Workflow
+n8n execute --id=5
+```
+
+```bash JSON Output Only
+n8n execute --id=10 --rawOutput
+```
+</CodeGroup>
+
+<Note>
+  The execute command does not support queue mode and will automatically fall back to regular execution mode.
+</Note>
+
+### execute-batch
+
+Executes multiple workflows for testing and comparison purposes.
+
+```bash
+n8n execute-batch
+```
+
+<ParamField path="--ids" type="string">
+  Comma-separated workflow IDs or path to file containing IDs.
+</ParamField>
+
+<ParamField path="--concurrency" type="number" default="1">
+  How many workflows can run in parallel.
+</ParamField>
+
+<ParamField path="--debug" type="boolean" default="false">
+  Display all errors and debug messages.
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Path to save execution results JSON file.
+</ParamField>
+
+<ParamField path="--snapshot" type="string">
+  Directory to save execution snapshots for later comparison.
+</ParamField>
+
+<ParamField path="--compare" type="string">
+  Directory containing snapshots to compare against current execution.
+</ParamField>
+
+<ParamField path="--shallow" type="boolean" default="false">
+  Compare only top-level attributes, ignoring nested JSON objects.
+</ParamField>
+
+<ParamField path="--skipList" type="string">
+  Path to JSON file containing workflow IDs to skip.
+</ParamField>
+
+<ParamField path="--retries" type="number" default="1">
+  Number of times to retry failed workflows (0 to disable).
+</ParamField>
+
+<ParamField path="--shortOutput" type="boolean" default="false">
+  Show only summary, omitting full execution details.
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Execute All Workflows
+n8n execute-batch
+```
+
+```bash Execute Specific Workflows
+n8n execute-batch --ids=10,13,15 --shortOutput
+```
+
+```bash With Concurrency
+n8n execute-batch --concurrency=10 --skipList=/data/skipList.json
+```
+
+```bash Debug Mode
+n8n execute-batch --debug --output=/data/output.json
+```
+
+```bash Create Snapshots
+n8n execute-batch --snapshot=/data/snapshots --shallow
+```
+
+```bash Compare Executions
+n8n execute-batch --compare=/data/previousExecutionData --retries=2
+```
+</CodeGroup>
+
+<Note>
+  This command is particularly useful for automated testing, regression testing, and CI/CD workflows.
+</Note>
+
+## Additional Commands
+
+### List Commands
+
+<Tabs>
+  <Tab title="list:workflow">
+    Lists all workflows in the database.
+    
+    ```bash
+    n8n list:workflow
+    ```
+  </Tab>
+</Tabs>
+
+### Database Commands
+
+<Tabs>
+  <Tab title="db:reset">
+    Resets the database (development only).
+    
+    ```bash
+    n8n db:reset
+    ```
+  </Tab>
+  
+  <Tab title="db:prune">
+    Prunes execution data according to retention settings.
+    
+    ```bash
+    n8n db:prune
+    ```
+  </Tab>
+</Tabs>
+
+## Command-Line Options
+
+### Global Options
+
+These options work with most commands:
+
+| Option | Description |
+|--------|-------------|
+| `--version, -v, -V` | Display n8n version |
+| `--help` | Display help for command |
+
+## Interactive Features
+
+When running `n8n start` in a TTY terminal:
+
+- Press **`o`** to open the n8n editor in your browser
+- Press **`Ctrl+C`** to gracefully shut down n8n
+
+## Environment Configuration
+
+All CLI commands respect environment variables for configuration. See the [Environment Variables](/hosting/configuration) documentation for details.
+
+Key configuration areas:
+- Database connection
+- Execution mode (regular/queue)
+- Network and ports
+- Security settings
+- Node.js settings
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Execution Modes" icon="gears" href="/cli/execution">
+    Learn about different execution modes and flags
+  </Card>
+  
+  <Card title="Import/Export" icon="arrow-right-arrow-left" href="/cli/import-export">
+    Import and export workflows and credentials
+  </Card>
+  
+  <Card title="User Management" icon="users" href="/cli/user-management">
+    Manage users via CLI
+  </Card>
+  
+  <Card title="Configuration" icon="sliders" href="/configuration/configuration">
+    Configure n8n settings
+  </Card>
+</CardGroup>

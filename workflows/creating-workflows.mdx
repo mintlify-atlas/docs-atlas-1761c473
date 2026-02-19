@@ -1,0 +1,388 @@
+---
+title: Creating Workflows
+description: Learn how to create and structure workflows in n8n, including nodes, connections, and workflow parameters
+---
+
+# Creating Workflows
+
+Workflows are the foundation of n8n automation. A workflow is a collection of nodes connected together to automate tasks and process data. This guide explains how workflows are structured and how to work with them programmatically.
+
+## Workflow Structure
+
+A workflow in n8n consists of several key components defined by the `WorkflowParameters` interface:
+
+```typescript
+interface WorkflowParameters {
+  id?: string;
+  name?: string;
+  nodes: INode[];
+  connections: IConnections;
+  active: boolean;
+  nodeTypes: INodeTypes;
+  staticData?: IDataObject;
+  settings?: IWorkflowSettings;
+  pinData?: IPinData;
+}
+```
+
+### Key Components
+
+<Tabs>
+  <Tab title="Nodes">
+    Nodes are the building blocks of workflows. Each node represents a specific action or operation.
+
+    ```typescript
+    const node: INode = {
+      name: 'MyNode',
+      type: 'n8n-nodes-base.httpRequest',
+      typeVersion: 1,
+      position: [250, 300],
+      parameters: {
+        url: 'https://api.example.com/data',
+        method: 'GET'
+      }
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Connections">
+    Connections define how data flows between nodes. Connections are indexed by source node name.
+
+    ```typescript
+    const connections: IConnections = {
+      'Start': {
+        'main': [
+          [
+            {
+              node: 'Process',
+              type: 'main',
+              index: 0
+            }
+          ]
+        ]
+      }
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Static Data">
+    Static data persists across workflow executions, useful for storing state.
+
+    ```typescript
+    const staticData = {
+      global: { counter: 0 },
+      'node:MyNode': { lastRunTime: Date.now() }
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Creating a Workflow
+
+The `Workflow` class manages workflow execution and node relationships. Here's how workflows are initialized:
+
+<Steps>
+  <Step title="Initialize Workflow">
+    Create a new workflow instance with required parameters:
+
+    ```typescript
+    import { Workflow } from 'n8n-workflow';
+
+    const workflow = new Workflow({
+      id: 'workflow-123',
+      name: 'My Automation',
+      nodes: [
+        {
+          name: 'Start',
+          type: 'n8n-nodes-base.manualTrigger',
+          typeVersion: 1,
+          position: [250, 300],
+          parameters: {}
+        },
+        {
+          name: 'HTTP Request',
+          type: 'n8n-nodes-base.httpRequest',
+          typeVersion: 1,
+          position: [450, 300],
+          parameters: {
+            url: '={{$json.url}}',
+            method: 'GET'
+          }
+        }
+      ],
+      connections: {
+        'Start': {
+          main: [[{ node: 'HTTP Request', type: 'main', index: 0 }]]
+        }
+      },
+      active: true,
+      nodeTypes: nodeTypesInstance,
+      settings: {
+        timezone: 'America/New_York'
+      }
+    });
+    ```
+  </Step>
+
+  <Step title="Node Type Resolution">
+    During initialization, n8n resolves node types and applies default parameters:
+
+    ```typescript
+    // From workflow.ts:94-119
+    for (const node of parameters.nodes) {
+      nodeType = this.nodeTypes.getByNameAndVersion(
+        node.type, 
+        node.typeVersion
+      );
+
+      if (nodeType === undefined) {
+        // Node type not found - continues without error
+        // to allow expression resolution
+        continue;
+      }
+
+      // Add default values from node type description
+      const nodeParameters = NodeHelpers.getNodeParameters(
+        nodeType.description.properties,
+        node.parameters,
+        true,
+        false,
+        node,
+        nodeType.description,
+      );
+      node.parameters = nodeParameters !== null ? nodeParameters : {};
+    }
+    ```
+  </Step>
+
+  <Step title="Configure Connections">
+    Connections are stored in two formats for efficient traversal:
+
+    ```typescript
+    // Source-indexed (default)
+    this.connectionsBySourceNode = connections;
+    
+    // Destination-indexed (for finding parent nodes)
+    this.connectionsByDestinationNode = 
+      mapConnectionsByDestination(this.connectionsBySourceNode);
+    ```
+  </Step>
+</Steps>
+
+## Node Management
+
+### Accessing Nodes
+
+```typescript
+// Get a single node
+const node = workflow.getNode('MyNode');
+
+// Get multiple nodes
+const nodes = workflow.getNodes(['Node1', 'Node2', 'Node3']);
+
+// Query nodes by condition
+const triggerNodes = workflow.queryNodes(
+  (nodeType) => !!nodeType.trigger
+);
+```
+
+### Finding Trigger and Poll Nodes
+
+<CodeGroup>
+```typescript Trigger Nodes
+// Get all trigger nodes in the workflow
+const triggerNodes = workflow.getTriggerNodes();
+
+// These are nodes that start workflows automatically
+// Examples: Webhook, Schedule Trigger, Email Trigger
+```
+
+```typescript Poll Nodes
+// Get all poll nodes in the workflow
+const pollNodes = workflow.getPollNodes();
+
+// Poll nodes check external sources at intervals
+// Examples: RSS Feed, Email polling
+```
+</CodeGroup>
+
+## Connection Traversal
+
+<Note>
+Connections are indexed by **source node** by default. To find parent nodes, you must first invert the connections using `mapConnectionsByDestination()`.
+</Note>
+
+### Finding Parent and Child Nodes
+
+```typescript
+import { 
+  getParentNodes, 
+  getChildNodes, 
+  mapConnectionsByDestination 
+} from 'n8n-workflow';
+
+// Finding child nodes (successors) - uses connections directly
+const children = getChildNodes(
+  workflow.connectionsBySourceNode,
+  'NodeName',
+  'main',  // connection type
+  1        // depth (-1 for all)
+);
+
+// Finding parent nodes (predecessors) - requires inverted connections
+const connectionsByDestination = mapConnectionsByDestination(
+  workflow.connectionsBySourceNode
+);
+const parents = getParentNodes(
+  connectionsByDestination,
+  'NodeName',
+  'main',
+  1
+);
+
+// Or use workflow methods
+const childNodes = workflow.getChildNodes('NodeName', 'main', -1);
+const parentNodes = workflow.getParentNodes('NodeName', 'main', -1);
+```
+
+### Finding Highest Parent Nodes
+
+```typescript
+// Find the topmost nodes (entry points) for a given node
+const highestNodes = workflow.getHighestNode('MyNode');
+
+// These are the nodes with no incoming connections
+// in the execution path to MyNode
+```
+
+## Start Node Selection
+
+The workflow determines where to begin execution based on node types and connections:
+
+```typescript
+// Get the start node for the workflow
+const startNode = workflow.getStartNode();
+
+// Priority order:
+// 1. Trigger nodes (webhook, schedule, etc.)
+// 2. Poll nodes
+// 3. Manual triggers
+// 4. Execute Workflow Trigger
+// 5. Error Trigger
+
+// For partial execution, specify destination
+const startNode = workflow.getStartNode('TargetNode');
+```
+
+<Tip>
+Starting nodes are defined in `constants.ts` as `STARTING_NODE_TYPES`:
+- `n8n-nodes-base.manualTrigger`
+- `n8n-nodes-base.executeWorkflowTrigger`
+- `n8n-nodes-base.errorTrigger`
+- `n8n-nodes-base.evaluationTrigger`
+- `n8n-nodes-base.formTrigger`
+</Tip>
+
+## Static Data Management
+
+Static data persists across workflow executions:
+
+```typescript
+// Global static data (shared across all nodes)
+const globalData = workflow.getStaticData('global');
+globalData.executionCount = (globalData.executionCount || 0) + 1;
+
+// Node-specific static data
+const nodeData = workflow.getStaticData('node', node);
+nodeData.lastProcessed = new Date().toISOString();
+
+// Static data is stored as an ObservableObject
+// Changes are automatically tracked
+if (workflow.staticData.__dataChanged) {
+  // Save workflow with updated static data
+}
+```
+
+## Workflow Settings
+
+Workflows can have custom settings that affect execution:
+
+```typescript
+const settings: IWorkflowSettings = {
+  timezone: 'America/New_York',           // Timezone for date operations
+  saveManualExecutions: true,             // Save manual test runs
+  saveExecutionProgress: false,           // Save intermediate states
+  executionTimeout: 3600,                 // Max execution time (seconds)
+  executionOrder: 'v1',                   // Execution algorithm version
+  errorWorkflow: 'error-handler-workflow' // Workflow to run on errors
+};
+
+workflow.setSettings(settings);
+```
+
+## Pin Data
+
+Pin data allows you to use fixed data for specific nodes during development:
+
+```typescript
+const pinData: IPinData = {
+  'HTTP Request': [
+    {
+      json: {
+        id: 1,
+        name: 'Test User',
+        email: 'test@example.com'
+      }
+    }
+  ]
+};
+
+workflow.setPinData(pinData);
+
+// Get pinned data for a node
+const pinnedData = workflow.getPinDataOfNode('HTTP Request');
+```
+
+## Renaming Nodes
+
+When renaming nodes, all references must be updated:
+
+```typescript
+// Rename a node and update all references
+workflow.renameNode('OldNodeName', 'NewNodeName');
+
+// This updates:
+// 1. The node itself
+// 2. All connections to/from the node
+// 3. All expressions referencing the node
+// 4. Node references in parameters
+```
+
+<Note>
+Node names cannot use restricted JavaScript keywords like `hasOwnProperty`, `constructor`, `prototype`, etc. These names could cause security issues.
+</Note>
+
+## Best Practices
+
+1. **Always validate node types**: Check that node types exist before adding nodes to workflows
+2. **Use workflow methods for traversal**: Don't manually traverse connections; use built-in methods
+3. **Respect execution order**: Understand that workflows can have different execution orders (`v1` vs legacy)
+4. **Handle disabled nodes**: Disabled nodes (`disabled: true`) are skipped during execution
+5. **Consider timezone settings**: Date operations use the workflow's timezone setting
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Nodes Overview" icon="circle-nodes" href="/workflows/nodes-overview">
+    Learn about node types, parameters, and outputs
+  </Card>
+  <Card title="Expressions" icon="brackets-curly" href="/workflows/expressions">
+    Work with dynamic data using expressions
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/workflows/error-handling">
+    Handle errors and implement retry logic
+  </Card>
+  <Card title="Execution Modes" icon="play" href="/workflows/execution-modes">
+    Understand different workflow execution modes
+  </Card>
+</CardGroup>

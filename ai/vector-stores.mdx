@@ -1,0 +1,604 @@
+---
+title: Vector Stores
+description: Store and retrieve information using semantic search with vector databases in n8n
+---
+
+# Vector Stores
+
+Vector stores (also called vector databases) enable semantic search by storing text as high-dimensional vectors. This allows you to find information based on meaning rather than exact keyword matches.
+
+## What is a Vector Store?
+
+A vector store:
+
+1. **Converts text to vectors**: Uses embedding models to create numerical representations
+2. **Stores vectors efficiently**: Optimized for similarity search
+3. **Performs semantic search**: Finds similar content based on meaning
+4. **Returns relevant documents**: Retrieves the most similar items
+
+<Note>
+  Vector stores are essential for RAG (Retrieval Augmented Generation) applications, where you need to provide relevant context to language models.
+</Note>
+
+## Available Vector Stores
+
+n8n supports the following vector stores:
+
+<CardGroup cols={2}>
+  <Card title="Pinecone" icon="database">
+    Fully managed, production-ready vector database
+  </Card>
+  <Card title="Qdrant" icon="database">
+    Open-source vector search engine
+  </Card>
+  <Card title="Supabase" icon="database">
+    Postgres-based vector storage
+  </Card>
+  <Card title="In-Memory" icon="memory">
+    Local storage for development
+  </Card>
+  <Card title="Weaviate" icon="database">
+    AI-native vector database
+  </Card>
+  <Card title="Chroma" icon="database">
+    Embedding database for AI apps
+  </Card>
+  <Card title="Redis" icon="database">
+    Redis with vector search
+  </Card>
+  <Card title="PGVector" icon="database">
+    PostgreSQL extension
+  </Card>
+  <Card title="MongoDB Atlas" icon="database">
+    MongoDB with vector search
+  </Card>
+  <Card title="Milvus" icon="database">
+    Cloud-native vector database
+  </Card>
+  <Card title="Zep" icon="database">
+    Memory-optimized vector store
+  </Card>
+  <Card title="Azure AI Search" icon="cloud">
+    Microsoft Azure cognitive search
+  </Card>
+</CardGroup>
+
+## Common Operations
+
+All vector store nodes support these operations:
+
+- **Insert**: Add documents to the vector store
+- **Load**: Load documents from existing index
+- **Retrieve**: Search for similar documents
+- **Update**: Update existing documents
+- **Retrieve as Tool**: Use as an agent tool
+
+## Pinecone Vector Store
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStorePinecone`
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/vector_store/VectorStorePinecone/VectorStorePinecone.node.ts:54`
+
+Pinecone is a fully managed vector database optimized for production use.
+
+### Setup
+
+<Steps>
+  <Step title="Create Pinecone Account">
+    Sign up at [pinecone.io](https://www.pinecone.io/)
+  </Step>
+  
+  <Step title="Create an Index">
+    Create a new index with the appropriate dimensions for your embedding model:
+    - OpenAI text-embedding-3-small: 1536 dimensions
+    - OpenAI text-embedding-ada-002: 1536 dimensions
+    - Cohere embed-english-v3.0: 1024 dimensions
+  </Step>
+  
+  <Step title="Get API Key">
+    Copy your API key from the Pinecone dashboard
+  </Step>
+  
+  <Step title="Configure in n8n">
+    Add Pinecone credentials in n8n
+  </Step>
+</Steps>
+
+### Configuration
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+  "parameters": {
+    "pineconeIndex": "my-index",
+    "options": {
+      "pineconeNamespace": "documents",
+      "clearNamespace": false
+    }
+  }
+}
+```
+
+### Namespaces
+
+From the source code:
+
+```typescript
+const pineconeNamespaceField = {
+  displayName: 'Pinecone Namespace',
+  name: 'pineconeNamespace',
+  type: 'string',
+  description: 'Partition the records in an index into namespaces. Queries and other operations are then limited to one namespace.'
+};
+```
+
+<Tip>
+  Use namespaces to partition your data within a single index. Great for multi-tenancy or organizing different document types.
+</Tip>
+
+### Example: Insert Documents
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      {
+        "type": "documentDefaultDataLoader",
+        "parameters": {
+          "jsonData": "{{ $json.content }}"
+        }
+      },
+      {
+        "type": "textSplitterRecursiveCharacterTextSplitter",
+        "parameters": {
+          "chunkSize": 1000,
+          "chunkOverlap": 200
+        }
+      },
+      {
+        "type": "embeddingsOpenAi",
+        "parameters": {
+          "model": "text-embedding-3-small"
+        }
+      },
+      {
+        "type": "vectorStorePinecone",
+        "parameters": {
+          "mode": "insert",
+          "pineconeIndex": "my-docs"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Qdrant Vector Store
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreQdrant`
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/vector_store/VectorStoreQdrant/VectorStoreQdrant.node.ts:97`
+
+Qdrant is an open-source vector search engine with excellent performance.
+
+### Configuration
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+  "parameters": {
+    "qdrantCollection": "my-collection",
+    "options": {
+      "contentPayloadKey": "content",
+      "metadataPayloadKey": "metadata",
+      "collectionConfig": {
+        "vectors": {
+          "size": 1536,
+          "distance": "Cosine"
+        }
+      }
+    }
+  }
+}
+```
+
+### Payload Keys
+
+From the source code:
+
+```typescript
+const sharedOptions = [
+  {
+    displayName: 'Content Payload Key',
+    name: 'contentPayloadKey',
+    type: 'string',
+    default: 'content',
+    description: 'The key to use for the content payload in Qdrant.'
+  },
+  {
+    displayName: 'Metadata Payload Key',
+    name: 'metadataPayloadKey',
+    type: 'string',
+    default: 'metadata',
+    description: 'The key to use for the metadata payload in Qdrant.'
+  }
+];
+```
+
+### Search Filters
+
+Qdrant supports powerful filtering:
+
+```json
+{
+  "searchFilterJson": {
+    "should": [
+      {
+        "key": "metadata.category",
+        "match": {
+          "value": "documentation"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Supabase Vector Store
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreSupabase`
+
+PostgreSQL-based vector storage using pgvector extension.
+
+### Setup
+
+<Steps>
+  <Step title="Enable pgvector">
+    Enable the pgvector extension in your Supabase project
+  </Step>
+  
+  <Step title="Create Table">
+    Create a table for storing vectors:
+    
+    ```sql
+    create table documents (
+      id bigserial primary key,
+      content text,
+      metadata jsonb,
+      embedding vector(1536)
+    );
+    ```
+  </Step>
+  
+  <Step title="Create Index">
+    Add a vector similarity index:
+    
+    ```sql
+    create index on documents 
+    using ivfflat (embedding vector_cosine_ops)
+    with (lists = 100);
+    ```
+  </Step>
+</Steps>
+
+### Configuration
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+  "parameters": {
+    "tableName": "documents",
+    "queryName": "match_documents"
+  }
+}
+```
+
+## In-Memory Vector Store
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreInMemory`
+
+Local storage for development and testing.
+
+<Note>
+  In-Memory vector store is not persistent and will be lost when the workflow stops. Use only for development.
+</Note>
+
+### Insert Mode
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemoryInsert"
+}
+```
+
+### Load Mode
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemoryLoad"
+}
+```
+
+## Other Vector Stores
+
+### Weaviate
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreWeaviate`
+
+**Features**:
+- AI-native architecture
+- Automatic schema inference
+- Multi-modal support
+
+### Chroma
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreChromaDB`
+
+**Features**:
+- Embedded or client-server
+- Easy local development
+- Auto-batching
+
+### Redis
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreRedis`
+
+**Features**:
+- Fast in-memory search
+- Hybrid queries (vector + filters)
+- Real-time indexing
+
+### PGVector
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStorePGVector`
+
+**Features**:
+- Native PostgreSQL extension
+- ACID compliance
+- Standard SQL queries
+
+### MongoDB Atlas
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreMongoDBAtlas`
+
+**Features**:
+- Document-native vector search
+- Flexible schema
+- Atlas search integration
+
+### Milvus
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreMilvus`
+
+**Features**:
+- Cloud-native architecture
+- Billion-scale support
+- Multiple index types
+
+### Zep
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreZep`
+
+**Features**:
+- Memory-optimized
+- Automatic summarization
+- Fact extraction
+
+### Azure AI Search
+
+**Node**: `@n8n/n8n-nodes-langchain.vectorStoreAzureAISearch`
+
+**Features**:
+- Integrated with Azure
+- Cognitive search
+- Hybrid search
+
+## Building a RAG Pipeline
+
+<Steps>
+  <Step title="Load Documents">
+    Use a document loader to ingest your data
+    
+    ```typescript
+    {
+      "type": "documentBinaryInputLoader"
+    }
+    ```
+  </Step>
+  
+  <Step title="Split Text">
+    Break documents into chunks
+    
+    ```typescript
+    {
+      "type": "textSplitterRecursiveCharacterTextSplitter",
+      "parameters": {
+        "chunkSize": 1000,
+        "chunkOverlap": 200
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Generate Embeddings">
+    Convert text to vectors
+    
+    ```typescript
+    {
+      "type": "embeddingsOpenAi",
+      "parameters": {
+        "model": "text-embedding-3-small"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Insert into Vector Store">
+    Store vectors in your chosen database
+    
+    ```typescript
+    {
+      "type": "vectorStorePinecone",
+      "parameters": {
+        "mode": "insert"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Query with Retriever">
+    Use a retriever to search
+    
+    ```typescript
+    {
+      "type": "retrieverVectorStore",
+      "parameters": {
+        "topK": 4
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Answer Questions">
+    Use Q&A chain with retrieved context
+    
+    ```typescript
+    {
+      "type": "chainRetrievalQa"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Metadata Filtering
+
+Most vector stores support filtering by metadata:
+
+```json
+{
+  "metadataFilter": {
+    "category": "documentation",
+    "language": "en",
+    "date": { "$gte": "2024-01-01" }
+  }
+}
+```
+
+## Best Practices
+
+### Choosing a Vector Store
+
+<Tip>
+  **Development**: Use In-Memory or local Chroma  
+  **Production**: Use Pinecone, Qdrant, or Supabase  
+  **Existing DB**: Use PGVector, MongoDB Atlas, or Redis
+</Tip>
+
+### Chunking Strategy
+
+- **Chunk Size**: 500-1000 characters typically works well
+- **Overlap**: 10-20% overlap preserves context
+- **Splitter**: Use Recursive Character Text Splitter for best results
+
+### Embedding Models
+
+- **Match dimensions**: Vector store dimensions must match embedding model
+- **Consistency**: Always use the same embedding model for insert and retrieval
+- **Cost vs Quality**: Balance between performance and API costs
+
+### Performance
+
+- **Batch inserts**: Insert documents in batches for better performance
+- **Index configuration**: Configure appropriate index types (IVF, HNSW)
+- **Cache embeddings**: Avoid re-embedding the same content
+- **Monitor costs**: Track API usage for embedding generation
+
+### Metadata
+
+- **Add useful metadata**: Include source, date, category, etc.
+- **Keep it structured**: Use consistent schema across documents
+- **Enable filtering**: Design metadata for efficient filtering
+
+## Common Patterns
+
+### Multi-Tenant RAG
+
+Use namespaces or metadata filtering:
+
+```typescript
+{
+  "pineconeNamespace": "tenant_{{ $json.tenantId }}"
+}
+```
+
+### Hybrid Search
+
+Combine vector search with keyword search:
+
+```typescript
+// Use metadata filters for keywords
+{
+  "metadataFilter": {
+    "content": { "$contains": "keyword" }
+  }
+}
+```
+
+### Incremental Updates
+
+Update existing documents:
+
+```typescript
+{
+  "mode": "update",
+  "documentId": "{{ $json.id }}"
+}
+```
+
+## Troubleshooting
+
+### Dimension Mismatch
+
+**Error**: "Vector dimension mismatch"
+
+**Solution**: Ensure your vector store is configured with the correct dimensions for your embedding model.
+
+### Poor Search Results
+
+**Causes**:
+- Chunk size too large or too small
+- Wrong embedding model
+- Insufficient data
+- Missing context in chunks
+
+**Solutions**:
+- Adjust chunk size and overlap
+- Try different embedding models
+- Add more documents
+- Include surrounding context
+
+### Slow Performance
+
+**Solutions**:
+- Enable vector indexing (IVF, HNSW)
+- Reduce topK parameter
+- Use faster embedding models
+- Add metadata filters to narrow search
+- Consider caching strategies
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Embeddings" icon="layers" href="/ai/embeddings">
+    Learn about embedding models
+  </Card>
+  <Card title="Retrievers" icon="search">
+    Configure retrieval strategies
+  </Card>
+  <Card title="Q&A Chains" icon="message-circle">
+    Build RAG applications
+  </Card>
+  <Card title="Agent Tools" icon="wrench" href="/ai/agents">
+    Use vector stores as agent tools
+  </Card>
+</CardGroup>

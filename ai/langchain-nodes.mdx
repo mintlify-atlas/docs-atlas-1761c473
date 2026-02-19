@@ -1,0 +1,613 @@
+---
+title: LangChain Nodes Reference
+description: Complete reference for all LangChain nodes available in n8n, including chains, agents, tools, memory, and more
+---
+
+# LangChain Nodes Reference
+
+This page provides a comprehensive overview of all LangChain nodes available in n8n. These nodes are part of the `@n8n/nodes-langchain` package.
+
+## Node Categories
+
+<CardGroup cols={3}>
+  <Card title="Agents" icon="robot">
+    Autonomous AI systems
+  </Card>
+  <Card title="Chains" icon="link">
+    Pre-built AI workflows
+  </Card>
+  <Card title="Tools" icon="wrench">
+    Agent capabilities
+  </Card>
+  <Card title="Memory" icon="brain">
+    Conversation context
+  </Card>
+  <Card title="Vector Stores" icon="database">
+    Semantic search
+  </Card>
+  <Card title="Embeddings" icon="layers">
+    Text vectorization
+  </Card>
+  <Card title="Language Models" icon="message-square">
+    LLM providers
+  </Card>
+  <Card title="Document Loaders" icon="file-text">
+    Data ingestion
+  </Card>
+  <Card title="Text Splitters" icon="scissors">
+    Text chunking
+  </Card>
+</CardGroup>
+
+## Agents
+
+### AI Agent
+
+**Node**: `@n8n/n8n-nodes-langchain.agent`  
+**Type**: Root Node  
+**Description**: Main agent node for autonomous AI workflows
+
+**Inputs**:
+- Main (required)
+- Language Model (required)
+- Memory (optional)
+- Tools (optional, multiple)
+- Output Parser (optional)
+
+**Key Parameters**:
+- `promptType`: auto, define, or guardrails
+- `text`: Custom prompt text
+- `hasOutputParser`: Enable structured output
+- `needsFallback`: Enable fallback model
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/agents/Agent/V3/AgentV3.node.ts:25`
+
+### OpenAI Assistant
+
+**Node**: `@n8n/n8n-nodes-langchain.openAiAssistant`  
+**Type**: Root Node  
+**Description**: Use OpenAI's Assistant API with code interpreter and file search
+
+**Features**:
+- Code Interpreter
+- File Search
+- Function Calling
+- Persistent Threads
+
+## Chains
+
+Chains are pre-built workflows for common AI tasks.
+
+### Basic LLM Chain
+
+**Node**: `@n8n/n8n-nodes-langchain.chainLlm`  
+**Description**: Simple chain to prompt a language model
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/chains/ChainLLM/ChainLlm.node.ts:23`
+
+**Key Features**:
+- Simple prompting interface
+- Optional output parsing
+- Batch processing support
+- Streaming responses
+
+**Parameters**:
+```typescript
+{
+  promptType: 'auto' | 'define' | 'guardrails',
+  text?: string,
+  hasOutputParser?: boolean,
+  batching: {
+    batchSize: number,
+    delayBetweenBatches: number
+  }
+}
+```
+
+### Question and Answer Chain
+
+**Node**: `@n8n/n8n-nodes-langchain.chainRetrievalQa`  
+**Description**: Answer questions about retrieved documents (RAG)
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/chains/ChainRetrievalQA/ChainRetrievalQa.node.ts:20`
+
+**Inputs**:
+- Main (required)
+- Language Model (required)
+- Retriever (required)
+
+**Use Cases**:
+- Document Q&A
+- Knowledge base search
+- RAG applications
+
+### Summarization Chain
+
+**Node**: `@n8n/n8n-nodes-langchain.chainSummarization`  
+**Description**: Summarize long documents efficiently
+
+**Methods**:
+- Map-Reduce: Process chunks in parallel
+- Refine: Iteratively refine summary
+- Stuff: Single pass (for short docs)
+
+### Information Extractor
+
+**Node**: `@n8n/n8n-nodes-langchain.informationExtractor`  
+**Description**: Extract structured data from unstructured text
+
+**Features**:
+- Define custom schema
+- Extract multiple entities
+- Handle large documents
+
+### Text Classifier
+
+**Node**: `@n8n/n8n-nodes-langchain.textClassifier`  
+**Description**: Classify text into predefined categories
+
+**Use Cases**:
+- Content categorization
+- Intent detection
+- Topic classification
+
+### Sentiment Analysis
+
+**Node**: `@n8n/n8n-nodes-langchain.sentimentAnalysis`  
+**Description**: Analyze sentiment in text
+
+**Output**:
+- Positive, Negative, or Neutral
+- Confidence score
+
+## Tools
+
+Tools extend agent capabilities.
+
+### Calculator Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolCalculator`  
+**Description**: Perform mathematical calculations
+
+### Code Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolCode`  
+**Description**: Execute JavaScript or Python code
+
+**Parameters**:
+- `language`: javascript or python
+- `code`: Code to execute
+
+### HTTP Request Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolHttpRequest`  
+**Description**: Make HTTP requests to APIs
+
+**Parameters**:
+- `method`: GET, POST, PUT, DELETE, etc.
+- `url`: API endpoint
+- `authentication`: Auth method
+
+### Call n8n Sub-Workflow Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolWorkflow`  
+**Description**: Use another n8n workflow as a tool
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/tools/ToolWorkflow/ToolWorkflow.node.ts:10`
+
+<Tip>
+  This is the most powerful tool - turn ANY n8n workflow into a tool your agent can use!
+</Tip>
+
+**Parameters**:
+- `workflowId`: Target workflow
+- `description`: Tool description for agent
+- `inputs`: Input schema
+
+### Vector Store Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolVectorStore`  
+**Description**: Query vector stores for semantic search
+
+**Inputs**:
+- Vector Store (required)
+
+### Wikipedia Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolWikipedia`  
+**Description**: Search Wikipedia
+
+### SerpAPI Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolSerpApi`  
+**Description**: Search Google using SerpAPI
+
+**Requires**: SerpAPI credentials
+
+### SearXng Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolSearXng`  
+**Description**: Privacy-focused meta search engine
+
+### Wolfram Alpha Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolWolframAlpha`  
+**Description**: Computational knowledge engine
+
+### Think Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.toolThink`  
+**Description**: Internal reasoning tool for agents
+
+## Memory
+
+Memory nodes maintain conversation context.
+
+### Simple Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryBufferWindow`  
+**Description**: In-memory conversation buffer
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/memory/MemoryBufferWindow/MemoryBufferWindow.node.ts:75`
+
+**Parameters**:
+```typescript
+{
+  sessionIdType: 'customKey' | 'expressionKey',
+  sessionKey?: string,
+  contextWindowLength: number // Number of messages to remember
+}
+```
+
+<Note>
+  Not suitable for production environments with Queue Mode or multi-main setups.
+</Note>
+
+### Redis Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryRedisChat`  
+**Description**: Distributed memory using Redis
+
+**Best for**: Production with multiple workers
+
+### Postgres Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryPostgresChat`  
+**Description**: SQL-based persistent memory
+
+**Best for**: Queryable conversation history
+
+### MongoDB Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryMongoDbChat`  
+**Description**: Document-based memory storage
+
+### Xata Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryXata`  
+**Description**: Xata database memory
+
+### Zep Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryZep`  
+**Description**: Advanced memory with summarization and fact extraction
+
+**Features**:
+- Automatic summarization
+- Fact extraction
+- Long-term memory
+
+### Motorhead Memory
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryMotorhead`  
+**Description**: Motorhead memory service
+
+### Memory Manager
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryManager`  
+**Description**: Advanced memory management
+
+### Memory Chat Retriever
+
+**Node**: `@n8n/n8n-nodes-langchain.memoryChatRetriever`  
+**Description**: Retrieve relevant past conversations
+
+## Language Models
+
+### OpenAI Models
+
+**Chat Model**: `@n8n/n8n-nodes-langchain.lmChatOpenAi`  
+**Completion Model**: `@n8n/n8n-nodes-langchain.lmOpenAi`
+
+**Supported Models**:
+- GPT-4, GPT-4 Turbo
+- GPT-3.5 Turbo
+- Custom models via base URL
+
+### Anthropic (Claude)
+
+**Node**: `@n8n/n8n-nodes-langchain.lmChatAnthropic`
+
+**Models**:
+- Claude 3 Opus
+- Claude 3 Sonnet
+- Claude 3 Haiku
+
+### Google Models
+
+**Gemini**: `@n8n/n8n-nodes-langchain.lmChatGoogleGemini`  
+**Vertex AI**: `@n8n/n8n-nodes-langchain.lmChatGoogleVertex`
+
+### Azure OpenAI
+
+**Node**: `@n8n/n8n-nodes-langchain.lmChatAzureOpenAi`
+
+### Cohere
+
+**Chat Model**: `@n8n/n8n-nodes-langchain.lmChatCohere`  
+**Completion Model**: `@n8n/n8n-nodes-langchain.lmCohere`
+
+### Ollama (Local)
+
+**Chat Model**: `@n8n/n8n-nodes-langchain.lmChatOllama`  
+**Completion Model**: `@n8n/n8n-nodes-langchain.lmOllama`
+
+**Use Cases**:
+- Local/private deployments
+- No API costs
+- Custom models
+
+### Other Providers
+
+- **Groq**: `lmChatGroq` - Fast inference
+- **Mistral**: `lmChatMistralCloud`
+- **DeepSeek**: `lmChatDeepSeek`
+- **Hugging Face**: `lmOpenHuggingFaceInference`
+- **AWS Bedrock**: `lmChatAwsBedrock`
+- **OpenRouter**: `lmChatOpenRouter`
+- **Vercel AI Gateway**: `lmChatVercelAiGateway`
+- **X.AI (Grok)**: `lmChatXAiGrok`
+- **Lemonade AI**: `lmChatLemonade`
+
+## Retrievers
+
+Retrievers fetch relevant documents for RAG applications.
+
+### Vector Store Retriever
+
+**Node**: `@n8n/n8n-nodes-langchain.retrieverVectorStore`  
+**Description**: Retrieve documents from vector stores
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/retrievers/RetrieverVectorStore/RetrieverVectorStore.node.ts:14`
+
+**Parameters**:
+```typescript
+{
+  topK: number // Number of results to return
+}
+```
+
+### Contextual Compression Retriever
+
+**Node**: `@n8n/n8n-nodes-langchain.retrieverContextualCompression`  
+**Description**: Compress retrieved documents to relevant parts
+
+**Uses**: Reranker nodes to improve results
+
+### Multi-Query Retriever
+
+**Node**: `@n8n/n8n-nodes-langchain.retrieverMultiQuery`  
+**Description**: Generate multiple queries for better retrieval
+
+### Workflow Retriever
+
+**Node**: `@n8n/n8n-nodes-langchain.retrieverWorkflow`  
+**Description**: Use n8n workflow as a retriever
+
+## Document Loaders
+
+Load data from various sources.
+
+### Default Data Loader
+
+**Node**: `@n8n/n8n-nodes-langchain.documentDefaultDataLoader`  
+**Description**: Load text data from previous nodes
+
+### Binary Input Loader
+
+**Node**: `@n8n/n8n-nodes-langchain.documentBinaryInputLoader`  
+**Description**: Load documents from binary files
+
+**Supported Formats**:
+- PDF
+- DOCX
+- TXT
+- CSV
+- JSON
+- HTML
+- Markdown
+
+### JSON Input Loader
+
+**Node**: `@n8n/n8n-nodes-langchain.documentJsonInputLoader`  
+**Description**: Load structured JSON data
+
+### GitHub Loader
+
+**Node**: `@n8n/n8n-nodes-langchain.documentGithubLoader`  
+**Description**: Load files from GitHub repositories
+
+## Text Splitters
+
+Split documents into chunks for processing.
+
+### Character Text Splitter
+
+**Node**: `@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter`  
+**Description**: Split by character count
+
+**Parameters**:
+- `chunkSize`: Characters per chunk
+- `chunkOverlap`: Overlap between chunks
+
+### Recursive Character Text Splitter
+
+**Node**: `@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter`  
+**Description**: Smart splitting that preserves structure
+
+**Recommended**: Best for most use cases
+
+### Token Splitter
+
+**Node**: `@n8n/n8n-nodes-langchain.textSplitterTokenSplitter`  
+**Description**: Split by token count
+
+**Best for**: Precise token budget management
+
+## Output Parsers
+
+Structure LLM outputs.
+
+### Structured Output Parser
+
+**Node**: `@n8n/n8n-nodes-langchain.outputParserStructured`  
+**Description**: Parse into custom JSON schema
+
+**Example Schema**:
+```json
+{
+  "type": "object",
+  "properties": {
+    "answer": { "type": "string" },
+    "confidence": { "type": "number" }
+  },
+  "required": ["answer"]
+}
+```
+
+### Auto-fixing Output Parser
+
+**Node**: `@n8n/n8n-nodes-langchain.outputParserAutofixing`  
+**Description**: Automatically fix malformed JSON
+
+### Item List Output Parser
+
+**Node**: `@n8n/n8n-nodes-langchain.outputParserItemList`  
+**Description**: Extract lists from text
+
+## Rerankers
+
+Improve search result quality.
+
+### Cohere Reranker
+
+**Node**: `@n8n/n8n-nodes-langchain.rerankerCohere`  
+**Description**: Rerank search results using Cohere
+
+**Use with**: Contextual Compression Retriever
+
+## Triggers
+
+### Chat Trigger
+
+**Node**: `@n8n/n8n-nodes-langchain.chatTrigger`  
+**Description**: Webhook-based chat interface
+
+**Features**:
+- REST API endpoint
+- Streaming responses
+- Session management
+
+### Manual Chat Trigger
+
+**Node**: `@n8n/n8n-nodes-langchain.manualChatTrigger`  
+**Description**: Manual testing interface
+
+**Best for**: Development and testing
+
+## Utility Nodes
+
+### Model Selector
+
+**Node**: `@n8n/n8n-nodes-langchain.modelSelector`  
+**Description**: Dynamically select language models
+
+### Tool Executor
+
+**Node**: `@n8n/n8n-nodes-langchain.toolExecutor`  
+**Description**: Execute tools programmatically
+
+### Guardrails
+
+**Node**: `@n8n/n8n-nodes-langchain.guardrails`  
+**Description**: Add safety checks and input validation
+
+**Features**:
+- Input validation
+- Output filtering
+- Safety checks
+- Custom rules
+
+## MCP (Model Context Protocol)
+
+n8n supports MCP for advanced AI integrations:
+
+### MCP Client
+
+**Node**: `@n8n/n8n-nodes-langchain.mcpClient`  
+**Description**: Connect to MCP servers
+
+### MCP Client Tool
+
+**Node**: `@n8n/n8n-nodes-langchain.mcpClientTool`  
+**Description**: Use MCP as a tool
+
+### MCP Trigger
+
+**Node**: `@n8n/n8n-nodes-langchain.mcpTrigger`  
+**Description**: Trigger workflows from MCP events
+
+## Vendor-Specific Nodes
+
+### OpenAI Node
+
+**Node**: `@n8n/n8n-nodes-langchain.openAi`  
+**Description**: Direct OpenAI API access
+
+**Operations**:
+- Text generation
+- Image generation
+- Audio transcription
+- File operations
+
+### Anthropic Node
+
+**Node**: `@n8n/n8n-nodes-langchain.anthropic`  
+**Description**: Direct Anthropic API access
+
+### Google Gemini Node
+
+**Node**: `@n8n/n8n-nodes-langchain.googleGemini`  
+**Description**: Google Gemini operations
+
+### Ollama Node
+
+**Node**: `@n8n/n8n-nodes-langchain.ollama`  
+**Description**: Ollama server operations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build an Agent" icon="robot" href="/ai/agents">
+    Create your first AI agent
+  </Card>
+  <Card title="Vector Stores" icon="database" href="/ai/vector-stores">
+    Set up semantic search
+  </Card>
+  <Card title="Embeddings" icon="layers" href="/ai/embeddings">
+    Configure embedding models
+  </Card>
+  <Card title="Workflow Templates" icon="template">
+    Browse example workflows
+  </Card>
+</CardGroup>

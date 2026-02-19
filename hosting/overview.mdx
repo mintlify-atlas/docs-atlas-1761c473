@@ -1,0 +1,294 @@
+---
+title: Self-Hosting Overview
+description: Learn about self-hosting n8n, deployment options, and architecture choices for your workflow automation platform.
+---
+
+n8n is designed to be self-hosted, giving you complete control over your workflows, data, and infrastructure. Whether you're running a small team or an enterprise deployment, n8n provides flexible hosting options to meet your needs.
+
+## Why Self-Host n8n?
+
+<CardGroup cols={2}>
+  <Card title="Data Control" icon="shield-check">
+    Keep all workflow data, credentials, and execution logs within your infrastructure
+  </Card>
+  <Card title="Customization" icon="wrench">
+    Install custom nodes, configure security policies, and integrate with internal systems
+  </Card>
+  <Card title="Scalability" icon="chart-line">
+    Scale horizontally with worker nodes and queue mode for high-throughput workloads
+  </Card>
+  <Card title="Fair-Code License" icon="balance-scale">
+    Self-host with a sustainable fair-code license that protects both users and the project
+  </Card>
+</CardGroup>
+
+## Deployment Options
+
+### Single Instance (Regular Mode)
+
+Perfect for development, testing, or small production workloads. n8n runs as a single process handling the UI, workflow execution, and webhooks.
+
+**Best for:**
+- Development and testing environments
+- Small teams (< 10 users)
+- Low to moderate execution volume
+- Simple deployment requirements
+
+**Architecture:**
+```
+┌─────────────────────────┐
+│   n8n Main Process      │
+│  ┌──────────────────┐   │
+│  │ UI & API Server  │   │
+│  ├──────────────────┤   │
+│  │ Workflow Engine  │   │
+│  ├──────────────────┤   │
+│  │ Webhooks         │   │
+│  └──────────────────┘   │
+└─────────────────────────┘
+         │
+         ▼
+   ┌──────────┐
+   │ Database │
+   │ (SQLite/ │
+   │ Postgres)│
+   └──────────┘
+```
+
+### Queue Mode (Scaling Mode)
+
+For production workloads requiring horizontal scaling, queue mode distributes workflow execution across multiple worker processes using Redis as a message broker.
+
+**Best for:**
+- Production environments
+- High execution volume
+- Horizontal scaling needs
+- Multiple concurrent workflows
+
+**Architecture:**
+```
+┌──────────────────┐     ┌──────────────┐
+│   Main Process   │────▶│    Redis     │
+│  ┌────────────┐  │     │ (Job Queue)  │
+│  │ UI & API   │  │     └──────┬───────┘
+│  │ Server     │  │            │
+│  └────────────┘  │            │
+└──────────────────┘            │
+         │                      │
+         ▼                      ▼
+   ┌──────────┐    ┌────────────────────┐
+   │PostgreSQL│    │  Worker Processes  │
+   │ Database │    │ ┌────────────────┐ │
+   └──────────┘    │ │ Worker 1       │ │
+                   │ │ (Executions)   │ │
+                   │ ├────────────────┤ │
+                   │ │ Worker 2       │ │
+                   │ │ (Executions)   │ │
+                   │ ├────────────────┤ │
+                   │ │ Worker N       │ │
+                   │ │ (Executions)   │ │
+                   │ └────────────────┘ │
+                   └────────────────────┘
+```
+
+### Multi-Main Setup (Enterprise)
+
+For high availability and load distribution, run multiple main processes behind a load balancer. Requires an Enterprise license.
+
+**Best for:**
+- High availability requirements
+- Large enterprise deployments
+- Geographic distribution
+- Maximum uptime needs
+
+**Architecture:**
+```
+        ┌──────────────┐
+        │Load Balancer │
+        └──────┬───────┘
+               │
+      ┌────────┴────────┐
+      ▼                 ▼
+┌──────────┐      ┌──────────┐
+│ Main 1   │      │ Main 2   │
+└────┬─────┘      └────┬─────┘
+     │                 │
+     └────────┬────────┘
+              ▼
+      ┌──────────────┐
+      │    Redis     │
+      └──────┬───────┘
+             │
+             ▼
+      ┌──────────────┐
+      │  PostgreSQL  │
+      └──────────────┘
+             ▲
+             │
+      ┌──────┴───────┐
+      │   Workers    │
+      └──────────────┘
+```
+
+## Task Runners
+
+n8n uses task runners to execute workflow nodes in isolated environments for enhanced security and stability.
+
+<Tabs>
+  <Tab title="Internal Mode">
+    Task runners run as child processes spawned by n8n. This is the default mode and simplest to set up.
+    
+    ```bash
+    N8N_RUNNERS_MODE=internal
+    ```
+    
+    **Pros:**
+    - Automatic lifecycle management
+    - No additional infrastructure
+    - Simple configuration
+    
+    **Cons:**
+    - Shares resources with main process
+    - Less isolation
+  </Tab>
+  
+  <Tab title="External Mode">
+    Task runners run as separate processes or containers, providing better isolation and resource management.
+    
+    ```bash
+    # n8n configuration
+    N8N_RUNNERS_MODE=external
+    N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+    N8N_RUNNERS_AUTH_TOKEN=your-secure-token
+    
+    # Runner configuration
+    N8N_RUNNERS_TASK_BROKER_URI=http://n8n:5679
+    N8N_RUNNERS_AUTH_TOKEN=your-secure-token
+    ```
+    
+    **Pros:**
+    - Better isolation and security
+    - Independent scaling
+    - Resource allocation control
+    
+    **Cons:**
+    - Additional infrastructure
+    - More complex setup
+  </Tab>
+</Tabs>
+
+## Database Support
+
+n8n supports two database systems:
+
+<CardGroup cols={2}>
+  <Card title="SQLite" icon="database">
+    **Default database** - File-based, no additional setup required.
+    
+    - Perfect for development and testing
+    - Low to moderate workloads
+    - Single instance deployments
+    - Automatic backups with file copy
+  </Card>
+  
+  <Card title="PostgreSQL" icon="server">
+    **Recommended for production** - Robust, scalable database.
+    
+    - Production environments
+    - Queue mode deployments
+    - Multi-main setups
+    - High concurrency needs
+    - Advanced backup and replication
+  </Card>
+</CardGroup>
+
+## System Requirements
+
+### Minimum Requirements
+
+<Steps>
+  <Step title="CPU">
+    - **Single instance**: 1 CPU core
+    - **Queue mode**: 2+ CPU cores
+    - **Workers**: 1 CPU core per worker
+  </Step>
+  
+  <Step title="Memory">
+    - **Single instance**: 1GB RAM
+    - **Main process**: 2GB RAM
+    - **Worker process**: 512MB - 2GB RAM per worker
+    - **Task runners**: 256MB - 1GB RAM per runner
+  </Step>
+  
+  <Step title="Storage">
+    - **Base installation**: 500MB
+    - **Database**: Varies by execution history (plan for 1GB+)
+    - **Binary data**: Additional storage as needed
+  </Step>
+  
+  <Step title="Network">
+    - Port 5678 for web UI and API
+    - Port 5679 for task runner broker (external mode)
+    - Port 6379 for Redis (queue mode)
+    - Port 5432 for PostgreSQL (if using)
+  </Step>
+</Steps>
+
+### Recommended Production Setup
+
+```yaml
+Main Process:
+  - CPU: 2-4 cores
+  - RAM: 4GB
+  - Storage: 10GB
+
+Worker Processes (each):
+  - CPU: 2 cores
+  - RAM: 2GB
+  - Count: Based on execution volume
+
+Database (PostgreSQL):
+  - CPU: 2-4 cores
+  - RAM: 4-8GB
+  - Storage: 50GB+ (SSD recommended)
+
+Redis:
+  - CPU: 1-2 cores
+  - RAM: 2-4GB
+```
+
+## Security Considerations
+
+<Warning>
+  **Important Security Practices**
+  
+  - Always set a strong `N8N_ENCRYPTION_KEY` and back it up securely
+  - Use PostgreSQL with SSL/TLS for production deployments
+  - Configure Redis authentication and TLS
+  - Restrict file access with `N8N_RESTRICT_FILE_ACCESS_TO`
+  - Disable risky nodes in production (`NODES_EXCLUDE`)
+  - Use HTTPS/SSL for all external traffic
+  - Implement proper firewall rules
+  - Regular security updates and patches
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Docker Deployment" icon="docker" href="/hosting/docker">
+    Deploy n8n using Docker and Docker Compose
+  </Card>
+  <Card title="Configuration" icon="gear" href="/hosting/configuration">
+    Configure environment variables and settings
+  </Card>
+  <Card title="Scaling" icon="expand" href="/hosting/scaling">
+    Scale n8n with queue mode and workers
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [n8n GitHub Repository](https://github.com/n8n-io/n8n)
+- [Community Forum](https://community.n8n.io)
+- [Official Documentation](https://docs.n8n.io)
+- [Docker Hub](https://hub.docker.com/r/n8nio/n8n)

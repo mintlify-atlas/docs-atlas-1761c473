@@ -1,0 +1,518 @@
+---
+title: Expressions
+description: Learn how to use expressions in n8n to transform data, access node outputs, and create dynamic workflows
+---
+
+# Expressions
+
+Expressions allow you to dynamically transform and reference data in n8n workflows. They enable you to access data from previous nodes, use built-in functions, and create complex data transformations.
+
+## Expression Basics
+
+Expressions in n8n are wrapped in double curly braces and start with an equals sign:
+
+```javascript
+={{$json.fieldName}}
+={{$node["NodeName"].json.data}}
+={{new Date().toISOString()}}
+```
+
+### When to Use Expressions
+
+Expressions can be used in:
+- Node parameters (URLs, headers, body data)
+- Conditional logic (IF nodes, Switch nodes)
+- Data transformation (Set nodes, Code nodes)
+- Filter operations
+- Any string-type parameter
+
+## Expression Evaluation
+
+The `Expression` class handles all expression evaluation in n8n:
+
+```typescript
+// From expression.ts:180-181
+export class Expression {
+  constructor(private readonly workflow: Workflow) {}
+
+  // Initialize secure sandbox environment
+  static initializeGlobalContext(data: IDataObject) {
+    // Denylist dangerous globals
+    data.document = {};
+    data.window = {};
+    data.eval = {};
+    data.Function = {};
+    
+    // Allowlist safe utilities
+    data.Date = Date;
+    data.DateTime = DateTime;    // Luxon DateTime
+    data.Math = Math;
+    data.JSON = JSON;
+    data.Object = createSafeObject();  // Sanitized Object
+  }
+}
+```
+
+<Note>
+Expressions run in a sandboxed environment that blocks dangerous operations like `eval()`, `Function()`, `fetch()`, and access to `window` or `document` objects.
+</Note>
+
+## Data Access Patterns
+
+### Current Node Data
+
+<Tabs>
+  <Tab title="JSON Data">
+    Access JSON data from the current item:
+
+    ```javascript
+    // Current item's data
+    {{$json.fieldName}}
+    {{$json.user.email}}
+    {{$json.items[0].id}}
+
+    // Nested access
+    {{$json.response.data.users[0].name}}
+    ```
+  </Tab>
+
+  <Tab title="Binary Data">
+    Access binary file data:
+
+    ```javascript
+    // Binary file properties
+    {{$binary.data.fileName}}
+    {{$binary.data.mimeType}}
+    {{$binary.data.fileSize}}
+
+    // Check if binary data exists
+    {{$binary.data !== undefined}}
+    ```
+  </Tab>
+
+  <Tab title="Item Index">
+    Get the current item's index:
+
+    ```javascript
+    // Zero-based index
+    {{$itemIndex}}
+
+    // Use in expressions
+    {{"Item " + ($itemIndex + 1)}}
+    ```
+  </Tab>
+
+  <Tab title="Node Input">
+    Access all input data:
+
+    ```javascript
+    // All input items
+    {{$input.all()}}
+
+    // First item
+    {{$input.first()}}
+
+    // Last item
+    {{$input.last()}}
+
+    // Specific item
+    {{$input.item.json.fieldName}}
+    ```
+  </Tab>
+</Tabs>
+
+### Previous Node Data
+
+```javascript
+// Access data from a specific node
+{{$node["HTTP Request"].json.userId}}
+{{$node["Webhook"].json.body.email}}
+
+// Access specific item from a node
+{{$node["HTTP Request"].json[0].id}}
+
+// Check if node has data
+{{$node["HTTP Request"].json !== undefined}}
+```
+
+### Multiple Items
+
+When processing multiple items:
+
+```javascript
+// Map over all items
+{{$input.all().map(item => item.json.name)}}
+
+// Filter items
+{{$input.all().filter(item => item.json.age > 18)}}
+
+// Reduce items
+{{$input.all().reduce((sum, item) => sum + item.json.amount, 0)}}
+```
+
+## Built-in Functions and Variables
+
+### Date and Time
+
+<CodeGroup>
+```javascript Current Time
+// JavaScript Date
+{{new Date()}}
+{{new Date().toISOString()}}
+{{Date.now()}}
+
+// Luxon DateTime (recommended)
+{{DateTime.now()}}
+{{DateTime.now().toISO()}}
+{{DateTime.now().toFormat('yyyy-MM-dd')}}
+```
+
+```javascript Date Operations
+// Add/subtract time
+{{DateTime.now().plus({days: 7})}}
+{{DateTime.now().minus({hours: 2})}}
+
+// Parse dates
+{{DateTime.fromISO($json.dateString)}}
+{{DateTime.fromFormat($json.date, 'MM/dd/yyyy')}}
+
+// Date comparisons
+{{DateTime.now() > DateTime.fromISO($json.expiryDate)}}
+```
+
+```javascript Intervals and Durations
+// Duration
+{{Duration.fromObject({hours: 2, minutes: 30})}}
+{{Duration.fromISO('PT2H30M')}}
+
+// Interval
+{{Interval.fromDateTimes(
+  DateTime.fromISO($json.startDate),
+  DateTime.now()
+).length('days')}}
+```
+</CodeGroup>
+
+### Math Operations
+
+```javascript
+// Basic math
+{{Math.round($json.price * 1.2)}}
+{{Math.floor($json.value)}}
+{{Math.max(...$input.all().map(i => i.json.score))}}
+
+// Random numbers
+{{Math.random()}}
+{{Math.floor(Math.random() * 100)}}
+```
+
+### String Operations
+
+```javascript
+// String methods
+{{$json.name.toUpperCase()}}
+{{$json.email.toLowerCase()}}
+{{$json.text.trim()}}
+{{$json.description.substring(0, 100)}}
+
+// Template literals
+{{`Hello ${$json.name}, your order #${$json.orderId} is ready`}}
+
+// String concatenation
+{{$json.firstName + " " + $json.lastName}}
+
+// Regular expressions
+{{/\d{3}-\d{4}/.test($json.phone)}}
+{{$json.text.replace(/\s+/g, '-')}}
+```
+
+### Array Operations
+
+```javascript
+// Array methods
+{{$json.items.length}}
+{{$json.items.map(i => i.id)}}
+{{$json.items.filter(i => i.active)}}
+{{$json.items.find(i => i.id === 123)}}
+{{$json.items.some(i => i.quantity > 0)}}
+{{$json.items.every(i => i.validated)}}
+
+// Array manipulation
+{{$json.items.slice(0, 5)}}
+{{$json.items.concat($json.moreItems)}}
+{{[...$json.items, newItem]}}
+```
+
+### Object Operations
+
+```javascript
+// Object methods
+{{Object.keys($json)}}
+{{Object.values($json)}}
+{{Object.entries($json)}}
+
+// Object manipulation
+{{Object.assign({}, $json, {newField: 'value'})}}
+{{{...$json, updatedField: 'new value'}}}
+
+// Check properties
+{{$json.hasOwnProperty('fieldName')}}
+{{'fieldName' in $json}}
+```
+
+## Workflow Data Proxy
+
+The `WorkflowDataProxy` class provides access to workflow execution data:
+
+```typescript
+// Available in expressions
+const dataProxy = {
+  $json: currentItem.json,
+  $binary: currentItem.binary,
+  $itemIndex: currentItemIndex,
+  $node: nodeDataProxy,
+  $input: inputProxy,
+  $parameter: nodeParameters,
+  $workflow: workflowMetadata,
+  $execution: executionMetadata,
+  $vars: environmentVariables,
+  $env: environmentVariables  // Alias for $vars
+};
+```
+
+### Workflow Metadata
+
+```javascript
+// Workflow information
+{{$workflow.id}}
+{{$workflow.name}}
+{{$workflow.active}}
+
+// Execution information
+{{$execution.id}}
+{{$execution.mode}}  // 'manual', 'trigger', 'webhook'
+{{$execution.resumeUrl}}  // For wait nodes
+```
+
+### Environment Variables
+
+```javascript
+// Access environment variables
+{{$env.API_KEY}}
+{{$vars.DATABASE_URL}}
+
+// Use in configurations
+{{
+  url: $env.API_ENDPOINT,
+  headers: {
+    'Authorization': `Bearer ${$env.API_TOKEN}`
+  }
+}}
+```
+
+## Expression Security
+
+### Sandbox Protection
+
+The expression sandbox prevents malicious code execution:
+
+```typescript
+// From expression.ts:186-235
+static initializeGlobalContext(data: IDataObject) {
+  // Blocked: Remote code execution
+  data.eval = {};
+  data.Function = {};
+  data.setTimeout = {};
+  data.setInterval = {};
+
+  // Blocked: Network requests
+  data.fetch = {};
+  data.XMLHttpRequest = {};
+
+  // Blocked: Control flow
+  data.Promise = {};
+  data.Generator = {};
+  data.AsyncFunction = {};
+
+  // Blocked: Low-level access
+  data.WebAssembly = {};
+  data.Reflect = {};
+  data.Proxy = {};
+
+  // Allowed: Safe utilities
+  data.Date = Date;
+  data.DateTime = DateTime;
+  data.Math = Math;
+  data.JSON = JSON;
+  data.Object = createSafeObject();  // Sanitized version
+}
+```
+
+<Note>
+The safe `Object` wrapper blocks dangerous methods like `defineProperty`, `setPrototypeOf`, and `__defineGetter__` that could bypass security checks.
+</Note>
+
+### Error Handling
+
+Expressions can throw specific errors:
+
+```typescript
+// From expression.ts:39-51
+const isSyntaxError = (error: unknown): error is SyntaxError =>
+  error instanceof SyntaxError || 
+  (error instanceof Error && error.name === 'SyntaxError');
+
+const isExpressionError = (error: unknown): error is ExpressionError =>
+  error instanceof ExpressionError || 
+  error instanceof ExpressionExtensionError;
+
+const isTypeError = (error: unknown): error is TypeError =>
+  error instanceof TypeError || 
+  (error instanceof Error && error.name === 'TypeError');
+```
+
+## Advanced Patterns
+
+### Conditional Expressions
+
+```javascript
+// Ternary operator
+{{$json.status === 'active' ? 'Active User' : 'Inactive User'}}
+
+// Nullish coalescing
+{{$json.description ?? 'No description provided'}}
+
+// Logical OR for defaults
+{{$json.count || 0}}
+{{$json.name || 'Unknown'}}
+
+// Complex conditions
+{{
+  $json.score >= 90 ? 'A' :
+  $json.score >= 80 ? 'B' :
+  $json.score >= 70 ? 'C' : 'F'
+}}
+```
+
+### Data Transformation
+
+```javascript
+// Transform array of objects
+{{
+  $json.users.map(user => ({
+    id: user.id,
+    fullName: `${user.firstName} ${user.lastName}`,
+    email: user.email.toLowerCase()
+  }))
+}}
+
+// Aggregate data
+{{
+  $input.all().reduce((acc, item) => {
+    const category = item.json.category;
+    acc[category] = (acc[category] || 0) + item.json.amount;
+    return acc;
+  }, {})
+}}
+
+// Flatten nested arrays
+{{$json.items.flatMap(item => item.tags)}}
+```
+
+### Dynamic Node References
+
+Expressions can reference nodes dynamically:
+
+```javascript
+// Dynamic node name
+{{$node[$json.sourceNode].json.data}}
+
+// Conditional node reference
+{{
+  $json.useCache 
+    ? $node["Cache"].json.result 
+    : $node["API"].json.result
+}}
+```
+
+## Expression Extensions
+
+Custom extensions can be added to expressions:
+
+```typescript
+// From extensions/expression-extension.ts
+import { extend, extendOptional } from './extensions';
+import { extendSyntax } from './extensions/expression-extension';
+import { extendedFunctions } from './extensions/extended-functions';
+
+// Extend expression capabilities
+extend(dataProxy, functions, methods);
+```
+
+## Expression Best Practices
+
+1. **Keep expressions simple**: Complex logic belongs in Code nodes
+2. **Use descriptive variable names**: When using intermediate variables
+3. **Handle null/undefined**: Always check for data existence
+4. **Use type-safe operations**: Be aware of data types
+5. **Avoid side effects**: Expressions should be pure functions
+6. **Test with sample data**: Use the expression editor's test mode
+7. **Document complex expressions**: Add comments in Code nodes
+
+<Tip>
+**Expression Editor Tips:**
+- Press `Ctrl+Space` for autocomplete
+- Hover over variables to see their values
+- Use the "Test with sample data" feature
+- Check the expression syntax highlighting for errors
+</Tip>
+
+## Common Patterns
+
+### API Request with Dynamic Parameters
+
+```javascript
+// URL with query parameters
+{{$json.baseUrl + '?page=' + $json.page + '&limit=' + $json.limit}}
+
+// Or using template literal
+{{`${$json.baseUrl}?page=${$json.page}&limit=${$json.limit}`}}
+```
+
+### Data Validation
+
+```javascript
+// Check required fields
+{{
+  $json.email && 
+  $json.name && 
+  $json.email.includes('@')
+}}
+
+// Validate number range
+{{$json.age >= 18 && $json.age <= 120}}
+
+// Validate date
+{{DateTime.fromISO($json.date).isValid}}
+```
+
+### Error Messages
+
+```javascript
+// Descriptive error message
+{{
+  `Failed to process item ${$itemIndex + 1}: ` +
+  `Missing required field '${$json.missingField}'`
+}}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/workflows/error-handling">
+    Handle errors and implement retry logic
+  </Card>
+  <Card title="Execution Modes" icon="play" href="/workflows/execution-modes">
+    Understand workflow execution contexts
+  </Card>
+</CardGroup>

@@ -1,0 +1,744 @@
+---
+title: Node Testing
+description: Write comprehensive tests for n8n nodes using Jest and nock
+---
+
+# Node Testing
+
+Testing is crucial for ensuring your nodes work correctly and continue to work as the codebase evolves. n8n uses Jest for unit testing and provides testing utilities for nodes.
+
+## Testing Setup
+
+All node tests are located in the `packages/nodes-base/nodes/` directory alongside the node files.
+
+### File Naming Convention
+
+```
+MyNode/
+├── MyNode.node.ts
+├── MyNode.node.test.ts
+├── GenericFunctions.ts
+└── GenericFunctions.test.ts
+```
+
+### Running Tests
+
+<CodeGroup>
+```bash Run All Tests
+cd packages/nodes-base
+pnpm test
+```
+
+```bash Run Specific Test
+cd packages/nodes-base
+pnpm test MyNode
+```
+
+```bash Run in Watch Mode
+cd packages/nodes-base
+pnpm test -- --watch
+```
+
+```bash Run with Coverage
+cd packages/nodes-base
+pnpm test -- --coverage
+```
+</CodeGroup>
+
+## Testing Dependencies
+
+Common testing libraries used in n8n:
+
+```typescript
+import { mock } from 'jest-mock-extended';
+import type {
+  IExecuteFunctions,
+  INodeExecutionData,
+  ICredentialDataDecryptedObject,
+} from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import nock from 'nock';
+
+// Your node
+import { MyNode } from './MyNode.node';
+```
+
+| Library | Purpose |
+|---------|----------|
+| `jest` | Test framework |
+| `jest-mock-extended` | Type-safe mocking |
+| `nock` | HTTP mocking |
+| `n8n-workflow` | Node interfaces and types |
+
+## Basic Test Structure
+
+Here's a complete test file structure:
+
+```typescript
+import { mock } from 'jest-mock-extended';
+import type {
+  IExecuteFunctions,
+  INodeExecutionData,
+} from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+
+import { MyNode } from './MyNode.node';
+
+describe('MyNode', () => {
+  // Mock execution functions
+  const executeFunctions = mock<IExecuteFunctions>({
+    getNode: jest.fn().mockReturnValue({ name: 'MyNode Test' }),
+    continueOnFail: jest.fn().mockReturnValue(false),
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('execute', () => {
+    it('should execute successfully', async () => {
+      // Setup
+      executeFunctions.getInputData.mockReturnValue([
+        { json: { test: 'data' } },
+      ]);
+
+      // Execute
+      const result = await new MyNode().execute.call(executeFunctions);
+
+      // Assert
+      expect(result).toEqual([
+        [{ json: { success: true }, pairedItems: { item: 0 } }],
+      ]);
+    });
+  });
+});
+```
+
+## Mocking Execution Context
+
+The `IExecuteFunctions` interface provides the context for node execution. Mock it appropriately:
+
+<Tabs>
+  <Tab title="Basic Mocking">
+    ```typescript
+    const executeFunctions = mock<IExecuteFunctions>({
+      getNode: jest.fn().mockReturnValue({ 
+        name: 'Test Node',
+        type: 'n8n-nodes-base.myNode',
+      }),
+      continueOnFail: jest.fn().mockReturnValue(false),
+      getInputData: jest.fn().mockReturnValue([
+        { json: { id: 1, name: 'Test' } },
+      ]),
+    });
+    ```
+  </Tab>
+
+  <Tab title="Parameters">
+    ```typescript
+    // Mock getNodeParameter for different parameters
+    executeFunctions.getNodeParameter
+      .calledWith('operation', 0)
+      .mockReturnValue('create');
+
+    executeFunctions.getNodeParameter
+      .calledWith('resource', 0)
+      .mockReturnValue('user');
+
+    executeFunctions.getNodeParameter
+      .calledWith('name', 0)
+      .mockReturnValue('John Doe');
+
+    executeFunctions.getNodeParameter
+      .calledWith('options', 0)
+      .mockReturnValue({ timeout: 5000 });
+    ```
+  </Tab>
+
+  <Tab title="Credentials">
+    ```typescript
+    const credentials = mock<ICredentialDataDecryptedObject>({
+      apiKey: 'test-api-key',
+      baseUrl: 'https://api.example.com',
+    });
+
+    executeFunctions.getCredentials
+      .calledWith('myServiceApi')
+      .mockResolvedValue(credentials);
+    ```
+  </Tab>
+
+  <Tab title="Helpers">
+    ```typescript
+    // Mock HTTP request helper
+    executeFunctions.helpers.request.mockResolvedValue({
+      id: 1,
+      name: 'Test User',
+    });
+
+    // Mock returnJsonArray
+    executeFunctions.helpers.returnJsonArray.mockImplementation(
+      (data) => data.map((item) => ({ json: item }))
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## HTTP Mocking with Nock
+
+Use `nock` to mock external API calls:
+
+<CodeGroup>
+```typescript Basic GET Request
+import nock from 'nock';
+
+describe('API Tests', () => {
+  beforeEach(() => {
+    nock.cleanAll();
+  });
+
+  it('should fetch users', async () => {
+    // Mock the API response
+    nock('https://api.example.com')
+      .get('/users')
+      .reply(200, [
+        { id: 1, name: 'User 1' },
+        { id: 2, name: 'User 2' },
+      ]);
+
+    // Execute node
+    const result = await new MyNode().execute.call(executeFunctions);
+
+    // Assert
+    expect(result[0]).toHaveLength(2);
+    expect(result[0][0].json.name).toBe('User 1');
+  });
+});
+```
+
+```typescript POST Request
+nock('https://api.example.com')
+  .post('/users', {
+    name: 'New User',
+    email: 'user@example.com',
+  })
+  .reply(201, {
+    id: 3,
+    name: 'New User',
+    email: 'user@example.com',
+  });
+```
+
+```typescript Query Parameters
+nock('https://api.example.com')
+  .get('/users')
+  .query({ limit: 10, offset: 0 })
+  .reply(200, []);
+```
+
+```typescript Headers
+nock('https://api.example.com')
+  .get('/users')
+  .matchHeader('X-API-Key', 'test-key')
+  .matchHeader('Content-Type', 'application/json')
+  .reply(200, []);
+```
+
+```typescript Error Response
+nock('https://api.example.com')
+  .get('/users')
+  .reply(401, {
+    error: 'Unauthorized',
+    message: 'Invalid API key',
+  });
+```
+
+```typescript Network Error
+nock('https://api.example.com')
+  .get('/users')
+  .replyWithError('Network error');
+```
+</CodeGroup>
+
+## Real-World Example: AMQP Tests
+
+Here's the complete AMQP node test from the source code:
+
+```typescript
+import { mock } from 'jest-mock-extended';
+import type {
+  ICredentialDataDecryptedObject,
+  IExecuteFunctions,
+  ICredentialTestFunctions,
+  ICredentialsDecrypted,
+} from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+
+import { Amqp } from './Amqp.node';
+
+// Mock the entire rhea module
+const mockSender = {
+  close: jest.fn(),
+  send: jest.fn().mockReturnValue({ id: 'test-message-id' }),
+};
+
+const mockConnection = {
+  close: jest.fn(),
+  open_sender: jest.fn().mockReturnValue(mockSender),
+  options: { reconnect: true },
+};
+
+const mockContainer = {
+  connect: jest.fn().mockReturnValue(mockConnection),
+  on: jest.fn(),
+  once: jest.fn(),
+};
+
+jest.mock('rhea', () => ({
+  create_container: jest.fn(() => mockContainer),
+}));
+
+describe('AMQP Node', () => {
+  const credentials = mock<ICredentialDataDecryptedObject>({
+    hostname: 'localhost',
+    port: 5672,
+    username: 'testuser',
+    password: 'testpass',
+    transportType: 'tcp',
+  });
+
+  const executeFunctions = mock<IExecuteFunctions>({
+    getNode: jest.fn().mockReturnValue({ name: 'AMQP Test Node' }),
+    continueOnFail: jest.fn().mockReturnValue(false),
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    executeFunctions.getCredentials
+      .calledWith('amqp')
+      .mockResolvedValue(credentials);
+    
+    executeFunctions.getInputData.mockReturnValue([
+      { json: { testing: true } },
+    ]);
+    
+    executeFunctions.getNodeParameter
+      .calledWith('sink', 0)
+      .mockReturnValue('test/queue');
+    
+    executeFunctions.getNodeParameter
+      .calledWith('headerParametersJson', 0)
+      .mockReturnValue({});
+    
+    executeFunctions.getNodeParameter
+      .calledWith('options', 0)
+      .mockReturnValue({});
+
+    // Setup container event mocking
+    mockContainer.once.mockImplementation((event: string, callback: any) => {
+      if (event === 'sendable') {
+        callback({ sender: mockSender });
+      }
+    });
+  });
+
+  it('should throw error when sink is empty', async () => {
+    executeFunctions.getNodeParameter
+      .calledWith('sink', 0)
+      .mockReturnValue('');
+
+    await expect(new Amqp().execute.call(executeFunctions)).rejects.toThrow(
+      new NodeOperationError(
+        executeFunctions.getNode(),
+        'Queue or Topic required!'
+      ),
+    );
+  });
+
+  it('should send message successfully', async () => {
+    const result = await new Amqp().execute.call(executeFunctions);
+
+    expect(result).toEqual([
+      [{ json: { id: 'test-message-id' }, pairedItems: { item: 0 } }],
+    ]);
+    expect(executeFunctions.getCredentials).toHaveBeenCalledWith('amqp');
+    expect(mockContainer.connect).toHaveBeenCalled();
+    expect(mockConnection.open_sender).toHaveBeenCalledWith('test/queue');
+    expect(mockSender.send).toHaveBeenCalledWith({
+      application_properties: {},
+      body: '{"testing":true}',
+    });
+    expect(mockSender.close).toHaveBeenCalled();
+    expect(mockConnection.close).toHaveBeenCalled();
+  });
+
+  it('should handle multiple input items', async () => {
+    executeFunctions.getInputData.mockReturnValue([
+      { json: { item: 1 } },
+      { json: { item: 2 } },
+    ]);
+
+    const result = await new Amqp().execute.call(executeFunctions);
+
+    expect(result).toEqual([
+      [
+        { json: { id: 'test-message-id' }, pairedItems: { item: 0 } },
+        { json: { id: 'test-message-id' }, pairedItems: { item: 1 } },
+      ],
+    ]);
+    expect(mockSender.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('should continue on fail when configured', async () => {
+    executeFunctions.continueOnFail.mockReturnValue(true);
+    executeFunctions.getNodeParameter
+      .calledWith('sink', 0)
+      .mockReturnValue('');
+
+    const result = await new Amqp().execute.call(executeFunctions);
+
+    expect(result).toEqual([
+      [{ json: { error: 'Queue or Topic required!' }, pairedItems: { item: 0 } }],
+    ]);
+  });
+
+  describe('credential test', () => {
+    it('should return success for valid credentials', async () => {
+      const amqp = new Amqp();
+      const testFunctions = mock<ICredentialTestFunctions>();
+
+      mockContainer.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'connection_open') {
+          setImmediate(() => callback({}));
+        }
+      });
+
+      const result = await amqp.methods.credentialTest.amqpConnectionTest.call(
+        testFunctions,
+        {
+          data: credentials,
+          id: 'test',
+          name: 'test',
+          type: 'amqp',
+        } as ICredentialsDecrypted,
+      );
+
+      expect(result).toEqual({
+        status: 'OK',
+        message: 'Connection successful!',
+      });
+    });
+
+    it('should return error for invalid credentials', async () => {
+      const amqp = new Amqp();
+      const testFunctions = mock<ICredentialTestFunctions>();
+
+      mockContainer.on.mockImplementation((event: string, callback: any) => {
+        if (event === 'disconnected') {
+          setImmediate(() => 
+            callback({ error: new Error('Authentication failed') })
+          );
+        }
+      });
+
+      const result = await amqp.methods.credentialTest.amqpConnectionTest.call(
+        testFunctions,
+        {
+          data: credentials,
+          id: 'test',
+          name: 'test',
+          type: 'amqp',
+        } as ICredentialsDecrypted,
+      );
+
+      expect(result).toEqual({
+        status: 'Error',
+        message: 'Authentication failed',
+      });
+    });
+  });
+});
+```
+
+## Testing Patterns
+
+### Test Operations
+
+<Steps>
+  <Step title="Test Happy Path">
+    Test the expected successful execution:
+
+    ```typescript
+    it('should create user successfully', async () => {
+      executeFunctions.getNodeParameter
+        .calledWith('operation', 0)
+        .mockReturnValue('create');
+
+      nock('https://api.example.com')
+        .post('/users')
+        .reply(201, { id: 1, name: 'New User' });
+
+      const result = await new MyNode().execute.call(executeFunctions);
+
+      expect(result[0][0].json).toMatchObject({ id: 1, name: 'New User' });
+    });
+    ```
+  </Step>
+
+  <Step title="Test Error Handling">
+    Test how the node handles errors:
+
+    ```typescript
+    it('should throw error on API failure', async () => {
+      nock('https://api.example.com')
+        .post('/users')
+        .reply(400, { error: 'Invalid data' });
+
+      await expect(
+        new MyNode().execute.call(executeFunctions)
+      ).rejects.toThrow();
+    });
+    ```
+  </Step>
+
+  <Step title="Test Edge Cases">
+    Test boundary conditions:
+
+    ```typescript
+    it('should handle empty input', async () => {
+      executeFunctions.getInputData.mockReturnValue([]);
+
+      const result = await new MyNode().execute.call(executeFunctions);
+
+      expect(result).toEqual([[]]);
+    });
+
+    it('should handle missing parameters', async () => {
+      executeFunctions.getNodeParameter
+        .calledWith('userId', 0)
+        .mockReturnValue('');
+
+      await expect(
+        new MyNode().execute.call(executeFunctions)
+      ).rejects.toThrow('User ID is required');
+    });
+    ```
+  </Step>
+
+  <Step title="Test Continue on Fail">
+    Test error handling with continueOnFail:
+
+    ```typescript
+    it('should continue on fail when configured', async () => {
+      executeFunctions.continueOnFail.mockReturnValue(true);
+
+      nock('https://api.example.com')
+        .post('/users')
+        .reply(400, { error: 'Bad request' });
+
+      const result = await new MyNode().execute.call(executeFunctions);
+
+      expect(result[0][0].json).toMatchObject({
+        error: expect.stringContaining('Bad request'),
+      });
+    });
+    ```
+  </Step>
+</Steps>
+
+### Test Binary Data
+
+```typescript
+it('should handle binary data', async () => {
+  executeFunctions.getInputData.mockReturnValue([
+    {
+      json: {},
+      binary: {
+        data: {
+          data: Buffer.from('test data'),
+          mimeType: 'text/plain',
+          fileName: 'test.txt',
+        },
+      },
+    },
+  ]);
+
+  const result = await new MyNode().execute.call(executeFunctions);
+
+  expect(result[0][0].binary).toBeDefined();
+});
+```
+
+### Test Pagination
+
+```typescript
+it('should handle pagination', async () => {
+  // First page
+  nock('https://api.example.com')
+    .get('/users')
+    .query({ page: 1 })
+    .reply(200, {
+      data: [{ id: 1 }, { id: 2 }],
+      nextPage: 2,
+    });
+
+  // Second page
+  nock('https://api.example.com')
+    .get('/users')
+    .query({ page: 2 })
+    .reply(200, {
+      data: [{ id: 3 }, { id: 4 }],
+      nextPage: null,
+    });
+
+  executeFunctions.getNodeParameter
+    .calledWith('returnAll', 0)
+    .mockReturnValue(true);
+
+  const result = await new MyNode().execute.call(executeFunctions);
+
+  expect(result[0]).toHaveLength(4);
+});
+```
+
+## Testing LoadOptions
+
+```typescript
+import type { ILoadOptionsFunctions } from 'n8n-workflow';
+
+describe('loadOptions', () => {
+  const loadOptionsFunctions = mock<ILoadOptionsFunctions>();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    loadOptionsFunctions.getCredentials
+      .calledWith('myServiceApi')
+      .mockResolvedValue({ apiKey: 'test-key' });
+  });
+
+  it('should load users', async () => {
+    nock('https://api.example.com')
+      .get('/users')
+      .reply(200, [
+        { id: '1', name: 'User 1' },
+        { id: '2', name: 'User 2' },
+      ]);
+
+    const node = new MyNode();
+    const result = await node.methods.loadOptions.getUsers.call(
+      loadOptionsFunctions,
+    );
+
+    expect(result).toEqual([
+      { name: 'User 1', value: '1' },
+      { name: 'User 2', value: '2' },
+    ]);
+  });
+});
+```
+
+## Testing Credential Tests
+
+```typescript
+import type { ICredentialTestFunctions } from 'n8n-workflow';
+
+describe('credentialTest', () => {
+  const credentialTestFunctions = mock<ICredentialTestFunctions>();
+
+  it('should validate correct credentials', async () => {
+    nock('https://api.example.com')
+      .get('/auth/verify')
+      .reply(200, { status: 'ok' });
+
+    const node = new MyNode();
+    const result = await node.methods.credentialTest.testApiCredentials.call(
+      credentialTestFunctions,
+      {
+        data: { apiKey: 'valid-key' },
+        id: 'test',
+        name: 'test',
+        type: 'myServiceApi',
+      } as ICredentialsDecrypted,
+    );
+
+    expect(result).toEqual({
+      status: 'OK',
+      message: 'Authentication successful',
+    });
+  });
+
+  it('should reject invalid credentials', async () => {
+    nock('https://api.example.com')
+      .get('/auth/verify')
+      .reply(401);
+
+    const node = new MyNode();
+    const result = await node.methods.credentialTest.testApiCredentials.call(
+      credentialTestFunctions,
+      {
+        data: { apiKey: 'invalid-key' },
+        id: 'test',
+        name: 'test',
+        type: 'myServiceApi',
+      } as ICredentialsDecrypted,
+    );
+
+    expect(result.status).toBe('Error');
+  });
+});
+```
+
+## Best Practices
+
+<Warning>
+  Follow these testing best practices for maintainable tests.
+</Warning>
+
+### DO:
+- ✅ Mock all external dependencies
+- ✅ Test happy paths, error cases, and edge cases
+- ✅ Use `jest.clearAllMocks()` in `beforeEach()`
+- ✅ Use `nock.cleanAll()` when testing HTTP requests
+- ✅ Test credential validation
+- ✅ Test continue-on-fail behavior
+- ✅ Use descriptive test names
+- ✅ Test with multiple items
+- ✅ Test binary data handling
+
+### DON'T:
+- ❌ Make real API calls in tests
+- ❌ Use `any` type in test code
+- ❌ Share state between tests
+- ❌ Test implementation details
+- ❌ Skip error case testing
+- ❌ Hardcode test data in multiple places
+
+## Coverage Requirements
+
+Aim for high test coverage:
+
+- **Statements**: > 80%
+- **Branches**: > 75%
+- **Functions**: > 80%
+- **Lines**: > 80%
+
+Check coverage:
+
+```bash
+cd packages/nodes-base
+pnpm test -- --coverage
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Versioning" icon="code-branch" href="/node-development/versioning">
+    Learn how to version your nodes
+  </Card>
+  
+  <Card title="Node Structure" icon="diagram-project" href="/node-development/node-structure">
+    Review node structure and implementation
+  </Card>
+</CardGroup>

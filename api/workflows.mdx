@@ -1,0 +1,779 @@
+---
+title: "Workflows API"
+description: "Create, manage, and execute workflows programmatically using the n8n REST API"
+---
+
+## Overview
+
+The Workflows API allows you to programmatically manage your automation workflows. You can create, read, update, delete, activate, and execute workflows through REST endpoints.
+
+## List Workflows
+
+Retrieve a paginated list of workflows.
+
+```http
+GET /api/v1/workflows
+```
+
+### Query Parameters
+
+<ParamField query="cursor" type="string">
+  Pagination cursor from previous response's `nextCursor`
+</ParamField>
+
+<ParamField query="limit" type="number" default="100">
+  Number of workflows to return (max: 250)
+</ParamField>
+
+<ParamField query="name" type="string">
+  Filter workflows by name (partial match)
+</ParamField>
+
+<ParamField query="active" type="boolean">
+  Filter by active status: `true` for active, `false` for inactive
+</ParamField>
+
+<ParamField query="tags" type="string">
+  Comma-separated tag names to filter by
+</ParamField>
+
+<ParamField query="projectId" type="string">
+  Filter workflows by project ID
+</ParamField>
+
+<ParamField query="excludePinnedData" type="boolean" default="false">
+  Exclude pinned test data from response
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -H "X-N8N-API-KEY: your-api-key" \
+  "https://your-n8n-instance.com/api/v1/workflows?active=true&limit=50"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows?active=true&limit=50',
+  {
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const { data, nextCursor } = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://your-n8n-instance.com/api/v1/workflows',
+    headers={'X-N8N-API-KEY': 'your-api-key'},
+    params={'active': True, 'limit': 50}
+)
+
+data = response.json()
+```
+</CodeGroup>
+
+### Response
+
+<ResponseField name="data" type="array">
+  Array of workflow objects
+  
+  <ResponseField name="id" type="string">
+    Unique workflow identifier
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    Workflow name
+  </ResponseField>
+  
+  <ResponseField name="active" type="boolean">
+    Whether the workflow is currently active
+  </ResponseField>
+  
+  <ResponseField name="nodes" type="array">
+    Array of node configurations in the workflow
+  </ResponseField>
+  
+  <ResponseField name="connections" type="object">
+    Node connection mappings
+  </ResponseField>
+  
+  <ResponseField name="settings" type="object">
+    Workflow settings and configurations
+  </ResponseField>
+  
+  <ResponseField name="createdAt" type="string">
+    ISO 8601 timestamp of creation
+  </ResponseField>
+  
+  <ResponseField name="updatedAt" type="string">
+    ISO 8601 timestamp of last update
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="nextCursor" type="string | null">
+  Cursor for next page of results, or `null` if no more results
+</ResponseField>
+
+```json Example Response
+{
+  "data": [
+    {
+      "id": "workflow_abc123",
+      "name": "Customer Onboarding",
+      "active": true,
+      "nodes": [
+        {
+          "id": "node_1",
+          "type": "n8n-nodes-base.webhook",
+          "name": "Webhook",
+          "position": [250, 300],
+          "parameters": {
+            "path": "customer-signup"
+          }
+        }
+      ],
+      "connections": {
+        "Webhook": {
+          "main": [[{ "node": "SendEmail", "type": "main", "index": 0 }]]
+        }
+      },
+      "settings": {
+        "executionOrder": "v1"
+      },
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-02-10T14:20:00.000Z"
+    }
+  ],
+  "nextCursor": "eyJsYXN0SWQiOiJ3b3JrZmxvd19hYmMxMjMiLCJsaW1pdCI6NTB9"
+}
+```
+
+## Get Workflow
+
+Retrieve a specific workflow by ID.
+
+```http
+GET /api/v1/workflows/:id
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="excludePinnedData" type="boolean" default="false">
+  Exclude pinned test data from response
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -H "X-N8N-API-KEY: your-api-key" \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123',
+  {
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const workflow = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns a single workflow object with full details including nodes, connections, and settings.
+
+## Create Workflow
+
+Create a new workflow.
+
+```http
+POST /api/v1/workflows
+```
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  Workflow name (max 128 characters)
+</ParamField>
+
+<ParamField body="nodes" type="array" required>
+  Array of node configurations
+</ParamField>
+
+<ParamField body="connections" type="object" required>
+  Object mapping node connections
+</ParamField>
+
+<ParamField body="settings" type="object">
+  Workflow settings and configuration
+</ParamField>
+
+<ParamField body="staticData" type="object">
+  Static data stored with the workflow
+</ParamField>
+
+<ParamField body="tags" type="string[]">
+  Array of tag IDs to assign
+</ParamField>
+
+<ParamField body="projectId" type="string">
+  Project ID to create workflow in (defaults to personal project)
+</ParamField>
+
+<ParamField body="meta" type="object">
+  Metadata about the workflow
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "New Customer Workflow",
+    "nodes": [
+      {
+        "id": "webhook_1",
+        "type": "n8n-nodes-base.webhook",
+        "name": "Webhook",
+        "position": [250, 300],
+        "parameters": {
+          "path": "new-customer",
+          "httpMethod": "POST"
+        }
+      }
+    ],
+    "connections": {},
+    "settings": {
+      "executionOrder": "v1"
+    }
+  }' \
+  https://your-n8n-instance.com/api/v1/workflows
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: 'New Customer Workflow',
+      nodes: [
+        {
+          id: 'webhook_1',
+          type: 'n8n-nodes-base.webhook',
+          name: 'Webhook',
+          position: [250, 300],
+          parameters: {
+            path: 'new-customer',
+            httpMethod: 'POST'
+          }
+        }
+      ],
+      connections: {},
+      settings: {
+        executionOrder: 'v1'
+      }
+    })
+  }
+);
+
+const workflow = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns the created workflow object with generated ID and additional metadata.
+
+<Note>
+New workflows are always created in inactive state. Use the activate endpoint to enable them.
+</Note>
+
+## Update Workflow
+
+Update an existing workflow.
+
+```http
+PATCH /api/v1/workflows/:id
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to update
+</ParamField>
+
+### Request Body
+
+All fields are optional. Only include fields you want to update.
+
+<ParamField body="name" type="string">
+  Updated workflow name
+</ParamField>
+
+<ParamField body="nodes" type="array">
+  Updated node configurations
+</ParamField>
+
+<ParamField body="connections" type="object">
+  Updated connection mappings
+</ParamField>
+
+<ParamField body="settings" type="object">
+  Updated workflow settings
+</ParamField>
+
+<ParamField body="staticData" type="object">
+  Updated static data
+</ParamField>
+
+<ParamField body="tags" type="string[]">
+  Updated array of tag IDs
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X PATCH \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated Workflow Name",
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/New_York"
+    }
+  }' \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123',
+  {
+    method: 'PATCH',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: 'Updated Workflow Name',
+      settings: {
+        executionOrder: 'v1',
+        timezone: 'America/New_York'
+      }
+    })
+  }
+);
+
+const updatedWorkflow = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns the updated workflow object.
+
+## Delete Workflow
+
+Permanently delete a workflow.
+
+```http
+DELETE /api/v1/workflows/:id
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to delete
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE \
+  -H "X-N8N-API-KEY: your-api-key" \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123',
+  {
+    method: 'DELETE',
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const result = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+```json
+{
+  "id": "workflow_abc123",
+  "name": "Deleted Workflow"
+}
+```
+
+<Warning>
+Deleting a workflow also deletes all associated execution history. This action cannot be undone.
+</Warning>
+
+## Activate Workflow
+
+Activate a workflow to run automatically based on triggers.
+
+```http
+POST /api/v1/workflows/:id/activate
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to activate
+</ParamField>
+
+### Request Body
+
+<ParamField body="versionId" type="string">
+  Specific version ID to activate
+</ParamField>
+
+<ParamField body="name" type="string">
+  Optional name for the active version
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description for the active version
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "versionId": "version_xyz",
+    "name": "Production Release"
+  }' \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/activate
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/activate',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      versionId: 'version_xyz',
+      name: 'Production Release'
+    })
+  }
+);
+
+const activeWorkflow = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns the activated workflow with `active: true`.
+
+## Deactivate Workflow
+
+Deactivate an active workflow.
+
+```http
+POST /api/v1/workflows/:id/deactivate
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to deactivate
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/deactivate
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/deactivate',
+  {
+    method: 'POST',
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const inactiveWorkflow = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns the deactivated workflow with `active: false`.
+
+## Execute Workflow
+
+Manually trigger a workflow execution.
+
+```http
+POST /api/v1/workflows/:id/run
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to execute
+</ParamField>
+
+### Request Body
+
+<ParamField body="workflowData" type="object" required>
+  The complete workflow configuration to execute
+</ParamField>
+
+<ParamField body="startNodes" type="string[]">
+  Array of node names to start execution from
+</ParamField>
+
+<ParamField body="destinationNode" type="string">
+  Target node name to execute up to
+</ParamField>
+
+<ParamField body="runData" type="object">
+  Input data for the execution
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workflowData": {
+      "id": "workflow_abc123",
+      "name": "Customer Onboarding",
+      "nodes": [...],
+      "connections": {...}
+    }
+  }' \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/run
+```
+
+```javascript JavaScript
+const workflow = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123',
+  { headers: { 'X-N8N-API-KEY': 'your-api-key' } }
+).then(r => r.json());
+
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/run',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      workflowData: workflow
+    })
+  }
+);
+
+const execution = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+```json
+{
+  "executionId": "execution_def456",
+  "finished": true,
+  "data": {
+    "resultData": {
+      "runData": {...}
+    }
+  }
+}
+```
+
+## Transfer Workflow
+
+Transfer a workflow to a different project.
+
+```http
+PUT /api/v1/workflows/:id/transfer
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The workflow ID to transfer
+</ParamField>
+
+### Request Body
+
+<ParamField body="destinationProjectId" type="string" required>
+  The target project ID
+</ParamField>
+
+<ParamField body="shareCredentials" type="boolean">
+  Whether to share associated credentials with the destination project
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X PUT \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destinationProjectId": "project_xyz789",
+    "shareCredentials": true
+  }' \
+  https://your-n8n-instance.com/api/v1/workflows/workflow_abc123/transfer
+```
+</CodeGroup>
+
+### Response
+
+Returns `204 No Content` on success.
+
+## Common Patterns
+
+### Cloning a Workflow
+
+<CodeGroup>
+```javascript Clone Workflow
+// 1. Get the source workflow
+const source = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows/source_id',
+  { headers: { 'X-N8N-API-KEY': 'your-api-key' } }
+).then(r => r.json());
+
+// 2. Create a copy with a new name
+const { id, createdAt, updatedAt, ...workflowData } = source;
+workflowData.name = `${workflowData.name} (Copy)`;
+
+const cloned = await fetch(
+  'https://your-n8n-instance.com/api/v1/workflows',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(workflowData)
+  }
+).then(r => r.json());
+```
+</CodeGroup>
+
+### Bulk Operations
+
+<CodeGroup>
+```javascript Activate Multiple Workflows
+const workflowIds = ['id1', 'id2', 'id3'];
+
+const results = await Promise.all(
+  workflowIds.map(id =>
+    fetch(
+      `https://your-n8n-instance.com/api/v1/workflows/${id}/activate`,
+      {
+        method: 'POST',
+        headers: { 'X-N8N-API-KEY': 'your-api-key' }
+      }
+    ).then(r => r.json())
+  )
+);
+
+console.log(`Activated ${results.length} workflows`);
+```
+</CodeGroup>
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "message": "Workflow with id \"workflow_abc123\" exists already."
+}
+```
+
+### 403 Forbidden
+
+```json
+{
+  "message": "You don't have the permissions to save the workflow in this project."
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "message": "Workflow with ID \"workflow_abc123\" does not exist"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Executions API" icon="play" href="/api/executions">
+    Monitor workflow executions
+  </Card>
+  <Card title="Credentials API" icon="lock" href="/api/credentials">
+    Manage workflow credentials
+  </Card>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn about API authentication
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/workflows/webhooks">
+    Trigger workflows via webhooks
+  </Card>
+</CardGroup>

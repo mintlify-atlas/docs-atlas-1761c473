@@ -1,122 +1,152 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
-  "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+  "name": "n8n",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
   },
-  "favicon": "/favicon.svg",
+  "theme": "aspen",
+  "colors": {
+    "primary": "#ea4b71",
+    "light": "#ff6d5a",
+    "dark": "#ea4b71"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/n8n-io/n8n"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/n8n-io/n8n",
+      "website": "https://n8n.io"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation",
+              "core-concepts"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Self-Hosting",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "hosting/overview",
+              "hosting/docker",
+              "hosting/configuration",
+              "hosting/scaling"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Building Workflows",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "workflows/creating-workflows",
+              "workflows/nodes-overview",
+              "workflows/expressions",
+              "workflows/error-handling",
+              "workflows/execution-modes"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "AI Workflows",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "ai/overview",
+              "ai/agents",
+              "ai/langchain-nodes",
+              "ai/vector-stores",
+              "ai/embeddings"
+            ]
+          },
+          {
+            "group": "Node Development",
+            "pages": [
+              "node-development/overview",
+              "node-development/node-structure",
+              "node-development/credentials",
+              "node-development/testing",
+              "node-development/versioning"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/commands",
+              "cli/execution",
+              "cli/import-export",
+              "cli/user-management"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/overview",
+              "api/authentication",
+              "api/workflows",
+              "api/executions",
+              "api/credentials"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Node API",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/node-types",
+              "api/node-execution",
+              "api/node-parameters"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Integration Catalog",
+            "pages": [
+              "integrations/overview",
+              "integrations/popular-nodes",
+              "integrations/triggers",
+              "integrations/actions"
+            ]
+          },
+          {
+            "group": "AI Integrations",
+            "pages": [
+              "integrations/ai/openai",
+              "integrations/ai/anthropic",
+              "integrations/ai/google-gemini",
+              "integrations/ai/langchain"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "contributing/setup",
+              "contributing/architecture",
+              "contributing/testing",
+              "contributing/guidelines"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

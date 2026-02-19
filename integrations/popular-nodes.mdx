@@ -1,0 +1,762 @@
+---
+title: Popular n8n Nodes
+description: Discover the most commonly used n8n integrations including Slack, Google Sheets, HTTP Request, and more
+---
+
+# Popular n8n Nodes
+
+These are the most frequently used nodes in the n8n ecosystem, chosen for their versatility, reliability, and broad application across different automation scenarios.
+
+## Essential Nodes
+
+### HTTP Request
+
+The Swiss Army knife of n8n - connect to any REST API.
+
+<Card title="HTTP Request Node" icon="globe">
+  **Use Cases:**
+  - Custom API integrations
+  - Internal service connections
+  - RESTful endpoint calls
+  - Webhook consumption
+
+  **Key Features:**
+  - All HTTP methods (GET, POST, PUT, DELETE, PATCH)
+  - Multiple authentication types
+  - Custom headers and query parameters
+  - Binary data support
+  - Automatic JSON parsing
+
+  **Configuration Example:**
+  ```json
+  {
+    "method": "POST",
+    "url": "https://api.example.com/users",
+    "authentication": "headerAuth",
+    "options": {
+      "response": {
+        "response": {
+          "fullResponse": false
+        }
+      }
+    }
+  }
+  ```
+</Card>
+
+<Note>
+  **Best Practice:** Prefer dedicated integration nodes over HTTP Request when available. Dedicated nodes provide better authentication, pre-configured parameters, and improved error handling.
+</Note>
+
+### Webhook
+
+Start workflows from external HTTP requests - the gateway to event-driven automation.
+
+<Card title="Webhook Trigger" icon="bolt">
+  **Use Cases:**
+  - Receive webhooks from external services
+  - Create custom API endpoints
+  - Form submission handling
+  - IoT device integration
+  - Third-party service notifications
+
+  **Key Features:**
+  - Test and production URLs
+  - Multiple HTTP methods support
+  - Built-in authentication options
+  - Custom response configuration
+  - CORS support
+  - IP allowlist filtering
+
+  **Example Webhook URL:**
+  ```
+  Production: https://your-n8n.com/webhook/user-signup
+  Test: https://your-n8n.com/webhook-test/user-signup
+  ```
+</Card>
+
+### Code
+
+Run custom JavaScript or Python for complex transformations.
+
+<Card title="Code Node" icon="code">
+  **Use Cases:**
+  - Complex data transformations
+  - Multi-step algorithms
+  - Custom business logic
+  - Date/time calculations
+  - String manipulation
+
+  **JavaScript Example:**
+  ```javascript
+  // Process multiple items
+  const processedItems = $input.all().map(item => ({
+    json: {
+      fullName: `${item.json.firstName} ${item.json.lastName}`,
+      email: item.json.email.toLowerCase(),
+      timestamp: new Date().toISOString()
+    }
+  }));
+
+  return processedItems;
+  ```
+
+  **Python Example:**
+  ```python
+  import pandas as pd
+  from datetime import datetime
+
+  # Process data with pandas
+  items = [item['json'] for item in _input.all()]
+  df = pd.DataFrame(items)
+  
+  # Transform data
+  df['processed_date'] = datetime.now()
+  
+  return df.to_dict('records')
+  ```
+</Card>
+
+<Warning>
+  Use Code node as a **last resort**. Native nodes like Set, Filter, and Aggregate are faster and easier to maintain. Code nodes run in a sandboxed environment with performance overhead.
+</Warning>
+
+## Communication Platforms
+
+### Slack
+
+The most popular team communication integration.
+
+<Tabs>
+  <Tab title="Overview">
+    **Current Version:** 2.4 (versioned node)
+
+    **Supported Operations:**
+    - **Message** - Send, update, delete messages
+    - **Channel** - Create, archive, list channels
+    - **User** - Get user info, list users
+    - **File** - Upload, list files
+    - **Reaction** - Add, remove reactions
+    - **Star** - Add, remove stars
+
+    **Authentication:** OAuth2 or Access Token
+
+    **Common Use Cases:**
+    - Team notifications
+    - Alert systems
+    - Approval workflows
+    - Bot interactions
+    - Status updates
+  </Tab>
+
+  <Tab title="Examples">
+    **Send a Rich Message:**
+    ```json
+    {
+      "resource": "message",
+      "operation": "post",
+      "channel": "#general",
+      "text": "New user registered!",
+      "attachments": [
+        {
+          "color": "#36a64f",
+          "fields": [
+            {
+              "title": "Email",
+              "value": "{{ $json.email }}",
+              "short": true
+            },
+            {
+              "title": "Name",
+              "value": "{{ $json.name }}",
+              "short": true
+            }
+          ]
+        }
+      ]
+    }
+    ```
+
+    **Upload a File:**
+    ```json
+    {
+      "resource": "file",
+      "operation": "upload",
+      "channels": "#reports",
+      "binaryProperty": "data",
+      "fileName": "monthly-report.pdf"
+    }
+    ```
+  </Tab>
+
+  <Tab title="Slack Trigger">
+    Listen for Slack events in real-time:
+
+    **Supported Events:**
+    - New messages
+    - Channel updates
+    - User mentions
+    - Reactions added
+    - File shared
+
+    **Setup:**
+    1. Create Slack App
+    2. Enable Event Subscriptions
+    3. Subscribe to bot events
+    4. Copy webhook URL to Slack
+
+    **Example Trigger Config:**
+    ```json
+    {
+      "event": "message",
+      "channel": "#support",
+      "resolve": "user"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Microsoft Teams
+
+Enterprise team collaboration platform.
+
+<Card title="Microsoft Teams" icon="microsoft">
+  **Operations:**
+  - Send messages to channels
+  - Create/manage channels
+  - Send chat messages
+  - Manage teams
+
+  **Authentication:** Microsoft OAuth2
+
+  **Example - Post to Channel:**
+  ```json
+  {
+    "resource": "message",
+    "operation": "create",
+    "teamId": "{{ $json.teamId }}",
+    "channelId": "{{ $json.channelId }}",
+    "messageType": "text",
+    "message": "Deployment completed successfully!"
+  }
+  ```
+</Card>
+
+### Discord
+
+Gaming and community platform integration.
+
+<Card title="Discord" icon="discord">
+  **Operations:**
+  - Send messages
+  - Manage channels
+  - Handle webhooks
+  - Manage roles
+  - Bot operations
+
+  **Authentication:** Bot Token or Webhook
+
+  **Webhook Example:**
+  ```json
+  {
+    "content": "Server status: Online ✅",
+    "username": "Status Bot",
+    "embeds": [
+      {
+        "title": "System Health",
+        "description": "All services operational",
+        "color": 5814783
+      }
+    ]
+  }
+  ```
+</Card>
+
+## Google Workspace
+
+### Google Sheets
+
+Spreadsheet automation powerhouse.
+
+<Tabs>
+  <Tab title="Operations">
+    **Document Operations:**
+    - Read/write rows
+    - Append data
+    - Update rows
+    - Delete rows
+    - Clear sheet
+    - Look up values
+
+    **Advanced Features:**
+    - Resource locators (by URL, ID, or list)
+    - Column mapping
+    - Formula support
+    - Batch operations
+    - Upsert functionality
+
+    **Authentication:** Google OAuth2
+  </Tab>
+
+  <Tab title="Examples">
+    **Append Row:**
+    ```json
+    {
+      "operation": "appendOrUpdate",
+      "documentId": "1BxiMVs0XRA5n...",
+      "sheetName": "Sheet1",
+      "columns": {
+        "mappingMode": "defineBelow",
+        "value": {
+          "Name": "={{ $json.name }}",
+          "Email": "={{ $json.email }}",
+          "Date": "={{ $now.format('yyyy-MM-dd') }}"
+        }
+      }
+    }
+    ```
+
+    **Look Up Row:**
+    ```json
+    {
+      "operation": "readRows",
+      "documentId": "{{ $json.spreadsheetId }}",
+      "sheetName": "Customers",
+      "filters": {
+        "conditions": [
+          {
+            "field": "Email",
+            "condition": "equals",
+            "value": "{{ $json.email }}"
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Trigger">
+    **Google Sheets Trigger:**
+    
+    Monitor spreadsheet changes with polling:
+
+    **Trigger Types:**
+    - Row added
+    - Row updated
+    - Row added or updated
+
+    **Configuration:**
+    ```json
+    {
+      "event": "rowAdded",
+      "documentId": "1BxiMVs0XRA5n...",
+      "sheetName": "Sheet1",
+      "pollTime": 300000  // 5 minutes
+    }
+    ```
+
+    **How It Works:**
+    - Polls spreadsheet at regular intervals
+    - Compares with previous state
+    - Triggers on detected changes
+    - Uses workflow static data for state
+  </Tab>
+</Tabs>
+
+### Gmail
+
+Email automation and management.
+
+<Card title="Gmail" icon="envelope">
+  **Operations:**
+  - Send emails
+  - Search messages
+  - Add labels
+  - Mark as read/unread
+  - Download attachments
+  - Delete messages
+
+  **Gmail Trigger:**
+  - Polling-based trigger
+  - Monitor inbox or labels
+  - Filter by sender, subject
+  - Process attachments
+
+  **Send Email Example:**
+  ```json
+  {
+    "operation": "send",
+    "to": "user@example.com",
+    "subject": "Welcome to our service!",
+    "message": "<p>Thank you for signing up!</p>",
+    "options": {
+      "attachments": "data",
+      "ccList": "manager@example.com"
+    }
+  }
+  ```
+</Card>
+
+### Google Calendar
+
+Event scheduling and calendar management.
+
+<Card title="Google Calendar" icon="calendar">
+  **Operations:**
+  - Create events
+  - Update events
+  - Delete events
+  - Get event details
+  - List events
+
+  **Create Event Example:**
+  ```json
+  {
+    "operation": "create",
+    "calendarId": "primary",
+    "start": "2024-03-15T10:00:00",
+    "end": "2024-03-15T11:00:00",
+    "summary": "Team Standup",
+    "description": "Daily team sync",
+    "attendees": [
+      "team@example.com"
+    ]
+  }
+  ```
+</Card>
+
+### Google Drive
+
+File storage and sharing automation.
+
+<Card title="Google Drive" icon="google-drive">
+  **Operations:**
+  - Upload files
+  - Download files
+  - Create folders
+  - Move/copy files
+  - Share files
+  - List files/folders
+
+  **Google Drive Trigger:**
+  - Monitor for new files
+  - Watch specific folders
+  - Filter by file type
+
+  **Upload File Example:**
+  ```json
+  {
+    "operation": "upload",
+    "name": "{{ $json.filename }}",
+    "binaryProperty": "data",
+    "options": {
+      "parents": ["folder-id-123"]
+    }
+  }
+  ```
+</Card>
+
+## Data Processing
+
+### Set (Edit Fields)
+
+Transform and manipulate data without code.
+
+<Card title="Set Node" icon="pen">
+  **Operations:**
+  - Add/remove fields
+  - Rename fields
+  - Set values
+  - Use expressions
+  - Include/exclude fields
+
+  **Example:**
+  ```json
+  {
+    "mode": "manual",
+    "fields": {
+      "values": [
+        {
+          "name": "fullName",
+          "type": "stringValue",
+          "stringValue": "={{ $json.firstName }} {{ $json.lastName }}"
+        },
+        {
+          "name": "email",
+          "type": "stringValue",
+          "stringValue": "={{ $json.email.toLowerCase() }}"
+        },
+        {
+          "name": "age",
+          "type": "numberValue",
+          "numberValue": "={{ $json.birthYear ? $now.year() - $json.birthYear : null }}"
+        }
+      ]
+    }
+  }
+  ```
+
+  **Use Instead of Code Node For:**
+  - Field renaming
+  - Value transformation
+  - Data cleanup
+  - Type conversion
+</Card>
+
+### Filter
+
+Route or remove items based on conditions.
+
+<Card title="Filter Node" icon="filter">
+  **Condition Types:**
+  - String contains/equals
+  - Number comparisons
+  - Date comparisons
+  - Boolean checks
+  - Regex matching
+  - Empty/exists checks
+
+  **Example:**
+  ```json
+  {
+    "conditions": {
+      "combinator": "and",
+      "conditions": [
+        {
+          "leftValue": "={{ $json.status }}",
+          "operator": "equals",
+          "rightValue": "active"
+        },
+        {
+          "leftValue": "={{ $json.amount }}",
+          "operator": "gt",
+          "rightValue": 100
+        }
+      ]
+    }
+  }
+  ```
+</Card>
+
+### Merge
+
+Combine data from multiple branches.
+
+<Card title="Merge Node" icon="code-merge">
+  **Merge Modes:**
+  - **Append** - Combine all items
+  - **Keep Key Matches** - Join on matching field
+  - **Merge By Index** - Combine by position
+  - **Merge By Key** - Advanced key-based merging
+  - **Multiplex** - Create combinations
+
+  **Example - Merge by Key:**
+  ```json
+  {
+    "mode": "combine",
+    "mergeByFields": {
+      "values": [
+        {
+          "field1": "userId",
+          "field2": "id"
+        }
+      ]
+    },
+    "options": {
+      "joinMode": "keepMatches"
+    }
+  }
+  ```
+</Card>
+
+## Databases
+
+### PostgreSQL
+
+Powerful relational database integration.
+
+<Card title="PostgreSQL" icon="database">
+  **Operations:**
+  - Execute queries
+  - Insert rows
+  - Update rows
+  - Delete rows
+  - Transactions
+
+  **Query Example:**
+  ```sql
+  SELECT u.*, o.order_total
+  FROM users u
+  LEFT JOIN orders o ON u.id = o.user_id
+  WHERE u.created_at > $1
+  ORDER BY u.created_at DESC
+  ```
+
+  **Parameters:**
+  ```json
+  {
+    "$1": "={{ $json.startDate }}"
+  }
+  ```
+</Card>
+
+### MongoDB
+
+NoSQL document database operations.
+
+<Card title="MongoDB" icon="leaf">
+  **Operations:**
+  - Find documents
+  - Insert documents
+  - Update documents
+  - Delete documents
+  - Aggregate
+
+  **Find Example:**
+  ```json
+  {
+    "operation": "find",
+    "collection": "users",
+    "query": {
+      "status": "active",
+      "age": { "$gte": 18 }
+    },
+    "options": {
+      "sort": { "createdAt": -1 },
+      "limit": 100
+    }
+  }
+  ```
+</Card>
+
+## Schedule & Time
+
+### Schedule Trigger
+
+Run workflows on a time-based schedule.
+
+<Card title="Schedule Trigger" icon="clock">
+  **Trigger Intervals:**
+  - Seconds, minutes, hours
+  - Days, weeks, months
+  - Custom cron expressions
+  - Multiple schedules
+
+  **Examples:**
+  
+  **Daily at 9 AM:**
+  ```json
+  {
+    "rule": {
+      "interval": [
+        {
+          "field": "days",
+          "hoursInterval": 1,
+          "minutesInterval": 0,
+          "triggerAtHour": 9
+        }
+      ]
+    }
+  }
+  ```
+
+  **Every Monday:**
+  ```json
+  {
+    "rule": {
+      "interval": [
+        {
+          "field": "weeks",
+          "triggerAtDay": [1],
+          "triggerAtHour": 8
+        }
+      ]
+    }
+  }
+  ```
+
+  **Custom Cron:**
+  ```json
+  {
+    "rule": {
+      "interval": [
+        {
+          "field": "cronExpression",
+          "expression": "0 */30 9-17 * * 1-5"
+        }
+      ]
+    }
+  }
+  ```
+</Card>
+
+## CRM & Sales
+
+### HubSpot
+
+Marketing, sales, and service platform.
+
+<Card title="HubSpot" icon="hubspot">
+  **Resources:**
+  - Contacts
+  - Companies
+  - Deals
+  - Tickets
+  - Forms
+  - Engagements
+
+  **Create Contact Example:**
+  ```json
+  {
+    "resource": "contact",
+    "operation": "create",
+    "properties": {
+      "email": "{{ $json.email }}",
+      "firstname": "{{ $json.firstName }}",
+      "lastname": "{{ $json.lastName }}",
+      "phone": "{{ $json.phone }}",
+      "company": "{{ $json.company }}"
+    }
+  }
+  ```
+</Card>
+
+### Salesforce
+
+Enterprise CRM platform.
+
+<Card title="Salesforce" icon="salesforce">
+  **Resources:**
+  - Leads
+  - Accounts
+  - Contacts
+  - Opportunities
+  - Cases
+  - Custom objects
+
+  **SOQL Query Example:**
+  ```sql
+  SELECT Id, Name, Email, CreatedDate
+  FROM Lead
+  WHERE Status = 'New'
+  AND CreatedDate = TODAY
+  ORDER BY CreatedDate DESC
+  ```
+</Card>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trigger Nodes" icon="play" href="/integrations/triggers">
+    Learn about webhooks, polling, and schedule triggers
+  </Card>
+  <Card title="Action Nodes" icon="bolt" href="/integrations/actions">
+    Explore data transformation and action nodes
+  </Card>
+  <Card title="Build a Workflow" icon="diagram-project" href="/quickstart">
+    Create your first automated workflow
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Detailed API documentation for all nodes
+  </Card>
+</CardGroup>

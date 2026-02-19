@@ -1,0 +1,623 @@
+---
+title: Error Handling
+description: Learn how to handle errors, implement retry logic, and recover from failures in n8n workflows
+---
+
+# Error Handling
+
+n8n provides comprehensive error handling mechanisms at multiple levels: node-level, workflow-level, and system-level. Understanding these mechanisms helps you build resilient workflows that gracefully handle failures.
+
+## Error Types
+
+n8n uses a hierarchical error system with specific error classes:
+
+### Node Errors
+
+<Tabs>
+  <Tab title="NodeOperationError">
+    Errors that occur during node execution:
+
+    ```typescript
+    // From errors/node-operation.error.ts
+    export class NodeOperationError extends NodeError {
+      constructor(
+        node: INode,
+        error: Error | string | JsonObject,
+        options: NodeOperationErrorOptions = {}
+      ) {
+        // Error context
+        this.context.runIndex = options.runIndex;
+        this.context.itemIndex = options.itemIndex;
+        this.context.metadata = options.metadata;
+        
+        // Severity level
+        this.level = options.level ?? 'warning';
+      }
+    }
+    ```
+
+    **When to use:**
+    - Invalid credentials
+    - API rate limiting
+    - Invalid parameters
+    - Business logic errors
+
+    **Example:**
+    ```typescript
+    throw new NodeOperationError(
+      this.getNode(),
+      'Invalid API key provided',
+      {
+        itemIndex: i,
+        description: 'Check your API credentials in node settings'
+      }
+    );
+    ```
+  </Tab>
+
+  <Tab title="NodeApiError">
+    Errors from external API calls:
+
+    ```typescript
+    export class NodeApiError extends NodeError {
+      httpCode?: string;
+      
+      constructor(
+        node: INode,
+        error: JsonObject,
+        options: NodeApiErrorOptions = {}
+      ) {
+        this.httpCode = error.statusCode?.toString();
+        this.context.request = options.request;
+      }
+    }
+    ```
+
+    **When to use:**
+    - HTTP request failures
+    - API errors with status codes
+    - External service unavailability
+
+    **Example:**
+    ```typescript
+    throw new NodeApiError(
+      this.getNode(),
+      {
+        statusCode: 429,
+        message: 'Rate limit exceeded'
+      },
+      {
+        request: requestOptions
+      }
+    );
+    ```
+  </Tab>
+
+  <Tab title="ExpressionError">
+    Errors in expression evaluation:
+
+    ```typescript
+    export class ExpressionError extends Error {
+      context: {
+        expression: string;
+        parameter: string;
+        node: string;
+      };
+    }
+    ```
+
+    **When thrown:**
+    - Syntax errors in expressions
+    - Type errors in expression evaluation
+    - Undefined variable access
+
+    **Example:**
+    ```typescript
+    // Expression: {{$json.user.email}}
+    // When $json.user is undefined
+    throw new ExpressionError(
+      "Cannot read property 'email' of undefined",
+      { expression, parameter: 'email', node: 'HTTP Request' }
+    );
+    ```
+  </Tab>
+
+  <Tab title="WorkflowError">
+    Workflow-level errors:
+
+    ```typescript
+    export class WorkflowOperationError extends Error {}
+    export class WorkflowActivationError extends Error {}
+    ```
+
+    **Examples:**
+    - Workflow cannot be activated
+    - Missing required nodes
+    - Invalid workflow structure
+    - Circular dependencies
+  </Tab>
+</Tabs>
+
+## Node-Level Error Handling
+
+### Retry Configuration
+
+Nodes can automatically retry on failure:
+
+```typescript
+const node: INode = {
+  name: 'HTTP Request',
+  type: 'n8n-nodes-base.httpRequest',
+  typeVersion: 1,
+  position: [450, 300],
+  parameters: {
+    url: 'https://api.example.com/data'
+  },
+  // Retry configuration
+  retryOnFail: true,
+  maxTries: 3,
+  waitBetweenTries: 1000  // milliseconds
+};
+```
+
+<Steps>
+  <Step title="First Attempt">
+    Node executes normally. If it succeeds, execution continues.
+  </Step>
+
+  <Step title="Failure Detected">
+    If the node throws an error and `retryOnFail` is `true`, the retry mechanism activates.
+  </Step>
+
+  <Step title="Wait Period">
+    System waits for `waitBetweenTries` milliseconds before retrying.
+  </Step>
+
+  <Step title="Retry Attempts">
+    Node executes again. This continues up to `maxTries` times.
+  </Step>
+
+  <Step title="Final Result">
+    - If any attempt succeeds, execution continues
+    - If all attempts fail, error handling logic applies
+  </Step>
+</Steps>
+
+### Continue on Fail
+
+Control whether workflow execution stops on node failure:
+
+```typescript
+const node: INode = {
+  name: 'Optional API Call',
+  type: 'n8n-nodes-base.httpRequest',
+  typeVersion: 1,
+  position: [450, 300],
+  parameters: {},
+  continueOnFail: true,      // Don't stop workflow
+  alwaysOutputData: true     // Output data even on error
+};
+```
+
+<CodeGroup>
+```typescript Stop on Failure (Default)
+const node = {
+  continueOnFail: false,
+  alwaysOutputData: false
+};
+// Behavior:
+// - Error thrown
+// - Workflow execution stops
+// - Error workflow triggered (if configured)
+// - No data passed to next nodes
+```
+
+```typescript Continue on Failure
+const node = {
+  continueOnFail: true,
+  alwaysOutputData: false
+};
+// Behavior:
+// - Error logged
+// - Workflow continues
+// - Empty array passed to next nodes
+// - No error workflow triggered
+```
+
+```typescript Continue with Error Data
+const node = {
+  continueOnFail: true,
+  alwaysOutputData: true
+};
+// Behavior:
+// - Error logged
+// - Workflow continues
+// - Item with error property passed to next nodes
+// - Next nodes can handle error
+```
+</CodeGroup>
+
+### Error Data Structure
+
+When `alwaysOutputData` is `true`, failed items include error information:
+
+```typescript
+interface INodeExecutionData {
+  json: IDataObject;
+  error?: {
+    message: string;
+    stack?: string;
+    context?: {
+      itemIndex?: number;
+      runIndex?: number;
+      parameter?: string;
+    };
+  };
+}
+
+// Example error data
+const errorOutput: INodeExecutionData = {
+  json: {
+    // Original input data
+    id: 123,
+    url: 'https://api.example.com/user/123'
+  },
+  error: {
+    message: 'Request failed with status code 404',
+    context: {
+      itemIndex: 2,
+      runIndex: 0
+    }
+  }
+};
+```
+
+## Workflow-Level Error Handling
+
+### Error Workflow
+
+Configure a dedicated error workflow to handle failures:
+
+```typescript
+const workflowSettings: IWorkflowSettings = {
+  errorWorkflow: 'error-handler-workflow-id'
+};
+```
+
+The error workflow receives:
+
+```typescript
+interface IExecutionError {
+  execution: {
+    id: string;
+    mode: WorkflowExecuteMode;
+    startedAt: Date;
+    workflowId: string;
+    workflowName: string;
+  };
+  workflow: {
+    id: string;
+    name: string;
+  };
+  node: {
+    name: string;
+    type: string;
+    parameters: INodeParameters;
+  };
+  error: {
+    message: string;
+    stack?: string;
+    context?: IDataObject;
+  };
+}
+```
+
+<Note>
+Error workflows run in `error` mode and receive the complete error context, allowing you to:
+- Send error notifications (email, Slack, etc.)
+- Log errors to external services
+- Trigger recovery workflows
+- Store error details for analysis
+</Note>
+
+### Error Trigger Node
+
+The Error Trigger node starts workflows when errors occur:
+
+```typescript
+// Error Trigger configuration
+const errorTrigger: INode = {
+  name: 'Error Trigger',
+  type: 'n8n-nodes-base.errorTrigger',
+  typeVersion: 1,
+  position: [250, 300],
+  parameters: {}
+};
+
+// Next node can access error data
+const emailNode: INode = {
+  name: 'Send Email',
+  type: 'n8n-nodes-base.emailSend',
+  typeVersion: 1,
+  position: [450, 300],
+  parameters: {
+    subject: '={{"Workflow Error: " + $json.workflow.name}}',
+    text: '={{$json.error.message}}',
+    html: `={
+      Workflow: {{$json.workflow.name}}<br>
+      Node: {{$json.node.name}}<br>
+      Error: {{$json.error.message}}<br>
+      Time: {{$json.execution.startedAt}}
+    }`
+  }
+};
+```
+
+## Execution-Level Error Handling
+
+### Execution Errors
+
+The execution engine tracks errors throughout workflow execution:
+
+```typescript
+// From workflow-execute.ts
+interface IRun {
+  data: IRunData;
+  mode: WorkflowExecuteMode;
+  startedAt: Date;
+  stoppedAt?: Date;
+  status: ExecutionStatus;  // 'new', 'running', 'success', 'error', 'canceled'
+  error?: ExecutionError;
+}
+
+// Execution status values
+type ExecutionStatus = 
+  | 'new'       // Just created
+  | 'running'   // Currently executing
+  | 'success'   // Completed successfully
+  | 'error'     // Failed with error
+  | 'waiting'   // Waiting for external event
+  | 'canceled'; // Manually canceled
+```
+
+### Timeout Handling
+
+```typescript
+const workflowSettings: IWorkflowSettings = {
+  executionTimeout: 3600  // seconds
+};
+
+// From workflow-execute.ts
+class WorkflowExecute {
+  timedOut: boolean = false;
+  
+  // Timeout causes execution to cancel
+  // Throws: TimeoutExecutionCancelledError
+}
+```
+
+### Manual Cancellation
+
+```typescript
+// Cancel an active execution
+workflowExecute.abortController.abort();
+
+// Throws: ManualExecutionCancelledError
+```
+
+## Error Recovery Patterns
+
+### Pattern 1: Graceful Degradation
+
+Continue with default values when optional operations fail:
+
+```javascript
+// In IF node or expression
+{{
+  $node["Optional API"].json !== undefined
+    ? $node["Optional API"].json.data
+    : { defaultValue: true }
+}}
+```
+
+### Pattern 2: Error Notification
+
+Notify team when critical operations fail:
+
+<Steps>
+  <Step title="Configure Error Workflow">
+    Set error workflow in workflow settings
+  </Step>
+
+  <Step title="Add Error Trigger">
+    Start error workflow with Error Trigger node
+  </Step>
+
+  <Step title="Send Notification">
+    Use Slack, Email, or webhook to alert team
+  </Step>
+</Steps>
+
+### Pattern 3: Fallback Service
+
+Try alternate services if primary fails:
+
+```typescript
+// Primary service node
+const primaryNode: INode = {
+  name: 'Primary API',
+  continueOnFail: true,
+  alwaysOutputData: true
+};
+
+// IF node checks for error
+const ifNode: INode = {
+  name: 'Check Error',
+  parameters: {
+    conditions: {
+      boolean: [
+        {
+          value1: '={{$json.error !== undefined}}',
+          operation: 'equal',
+          value2: true
+        }
+      ]
+    }
+  }
+};
+
+// Fallback service on true branch
+const fallbackNode: INode = {
+  name: 'Fallback API'
+};
+```
+
+### Pattern 4: Exponential Backoff
+
+Implement custom retry with increasing delays:
+
+```javascript
+// In Code node
+const maxRetries = 5;
+let attempt = 0;
+let success = false;
+let data = null;
+
+while (attempt < maxRetries && !success) {
+  try {
+    data = await makeRequest();
+    success = true;
+  } catch (error) {
+    attempt++;
+    if (attempt < maxRetries) {
+      const delay = Math.pow(2, attempt) * 1000;  // 2s, 4s, 8s, 16s, 32s
+      await new Promise(resolve => setTimeout(resolve, delay));
+    } else {
+      throw error;
+    }
+  }
+}
+
+return { json: data };
+```
+
+## Error Context and Debugging
+
+### Error Context Information
+
+Errors include detailed context for debugging:
+
+```typescript
+class NodeError extends Error {
+  node: INode;
+  context: {
+    itemIndex?: number;      // Which item failed
+    runIndex?: number;        // Which execution run
+    parameter?: string;       // Which parameter caused error
+    data?: IDataObject;      // Additional context
+  };
+  description?: string;       // User-friendly description
+  httpCode?: string;         // HTTP status code
+  cause?: Error;             // Original error
+}
+```
+
+### Accessing Error Details
+
+In error workflows or subsequent nodes:
+
+```javascript
+// Error message
+{{$json.error.message}}
+
+// Stack trace
+{{$json.error.stack}}
+
+// Failed node information
+{{$json.node.name}}
+{{$json.node.type}}
+
+// Execution context
+{{$json.execution.mode}}
+{{$json.execution.startedAt}}
+
+// Item that caused error
+{{$json.error.context.itemIndex}}
+```
+
+## Best Practices
+
+1. **Set appropriate retry counts**: Too many retries can delay error detection
+2. **Use meaningful error messages**: Include context for debugging
+3. **Configure error workflows**: Set up centralized error handling
+4. **Handle errors close to source**: Use `continueOnFail` judiciously
+5. **Log errors appropriately**: Balance detail with noise
+6. **Test error scenarios**: Deliberately trigger errors to test handling
+7. **Document error handling**: Explain expected failures in workflow notes
+8. **Monitor error rates**: Track and alert on unusual error patterns
+
+<Tip>
+**Testing Error Handling:**
+
+1. Use the "Test workflow" button with invalid data
+2. Temporarily set incorrect credentials to test auth errors
+3. Use the IF node to simulate random failures
+4. Test timeout behavior with long-running operations
+5. Verify error workflows receive correct data
+</Tip>
+
+## Common Error Scenarios
+
+### API Rate Limiting
+
+```typescript
+const node: INode = {
+  retryOnFail: true,
+  maxTries: 5,
+  waitBetweenTries: 60000  // Wait 1 minute between retries
+};
+```
+
+### Transient Network Errors
+
+```typescript
+const node: INode = {
+  retryOnFail: true,
+  maxTries: 3,
+  waitBetweenTries: 5000  // Wait 5 seconds
+};
+```
+
+### Optional Operations
+
+```typescript
+const node: INode = {
+  continueOnFail: true,
+  alwaysOutputData: false  // Don't pass error data forward
+};
+```
+
+### Critical Operations
+
+```typescript
+const node: INode = {
+  retryOnFail: true,
+  maxTries: 3,
+  continueOnFail: false  // Stop on failure
+};
+
+const workflowSettings: IWorkflowSettings = {
+  errorWorkflow: 'critical-error-handler'  // Alert team immediately
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Execution Modes" icon="play" href="/workflows/execution-modes">
+    Understand how workflows execute in different contexts
+  </Card>
+  <Card title="Creating Workflows" icon="diagram-project" href="/workflows/creating-workflows">
+    Learn more about workflow structure and design
+  </Card>
+</CardGroup>

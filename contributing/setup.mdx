@@ -1,0 +1,405 @@
+---
+title: Development Setup
+description: Set up your local n8n development environment with pnpm, Node.js, and all required dependencies
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+### Node.js
+
+[Node.js](https://nodejs.org/) version **24 or newer** is required for development.
+
+```bash
+node --version  # Should be 24.x or higher
+```
+
+### pnpm Package Manager
+
+n8n uses [pnpm](https://pnpm.io/) version **10.22 or newer** as its package manager. We recommend installing it with corepack for automatic version management.
+
+<Note>
+pnpm workspaces automatically manage file-links between modules that depend on each other in the monorepo.
+</Note>
+
+### Corepack
+
+Enable [Node.js corepack](https://nodejs.org/docs/latest-v16.x/api/corepack.html) to manage pnpm automatically:
+
+```bash
+corepack enable
+corepack prepare pnpm@10.22.0 --activate
+```
+
+<Warning>
+**macOS (Homebrew users):** If you installed Node.js via Homebrew, you need to install corepack separately:
+
+```bash
+brew install corepack
+```
+
+Homebrew explicitly removes `npm` and `corepack` from the Node.js formula.
+</Warning>
+
+<Warning>
+**Windows users:** Run the corepack commands in a terminal with administrator privileges:
+
+```bash
+corepack enable
+corepack prepare pnpm@10.22.0 --activate
+```
+</Warning>
+
+### Build Tools
+
+Some n8n dependencies require native compilation. Install the appropriate build tools for your operating system:
+
+<CodeGroup>
+
+```bash Debian/Ubuntu
+apt-get install -y build-essential python
+```
+
+```bash CentOS/RHEL
+yum install gcc gcc-c++ make
+```
+
+```bash Windows
+npm add -g windows-build-tools
+```
+
+```bash macOS
+# No additional packages required
+# Xcode Command Line Tools are sufficient
+```
+
+</CodeGroup>
+
+### actionlint (Optional)
+
+If you plan to modify GitHub Actions workflow files, install [actionlint](https://github.com/rhysd/actionlint):
+
+```bash
+# macOS
+brew install actionlint
+```
+
+<Note>
+actionlint is only required when modifying `.github/workflows/*.yml` files. It runs automatically via git hooks when workflow files change.
+</Note>
+
+## Development Container (Optional)
+
+If you use VS Code with Docker, you can use n8n's Dev Container for a pre-configured environment:
+
+1. Install [VS Code](https://code.visualstudio.com/) and [Docker](https://www.docker.com/)
+2. Click [here](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/n8n-io/n8n) to automatically clone and open n8n in a Dev Container
+
+The Dev Container includes all required tools and dependencies.
+
+## Initial Setup
+
+### For External Contributors
+
+<Steps>
+
+<Step title="Fork the repository">
+Go to [n8n-io/n8n](https://github.com/n8n-io/n8n) and click the "Fork" button in the top-right corner.
+</Step>
+
+<Step title="Clone your fork">
+```bash
+git clone https://github.com/<your_github_username>/n8n.git
+cd n8n
+```
+</Step>
+
+<Step title="Add upstream remote">
+```bash
+git remote add upstream https://github.com/n8n-io/n8n.git
+```
+
+This allows you to sync with the original repository:
+
+```bash
+git fetch upstream
+git merge upstream/master
+```
+</Step>
+
+<Step title="Install dependencies">
+```bash
+pnpm install
+```
+
+This installs all dependencies for all packages and automatically links them together using pnpm workspaces.
+</Step>
+
+<Step title="Build all packages">
+```bash
+pnpm build
+```
+
+<Warning>
+**Performance tip:** Redirect build output to a file to avoid overwhelming your terminal:
+
+```bash
+pnpm build > build.log 2>&1
+tail -n 20 build.log  # Check for errors
+```
+</Warning>
+</Step>
+
+</Steps>
+
+### For n8n Team Members
+
+<Steps>
+
+<Step title="Clone the repository">
+```bash
+git clone https://github.com/n8n-io/n8n.git
+cd n8n
+```
+</Step>
+
+<Step title="Install dependencies">
+```bash
+pnpm install
+```
+</Step>
+
+<Step title="Build all packages">
+```bash
+pnpm build > build.log 2>&1
+```
+</Step>
+
+</Steps>
+
+## Starting n8n
+
+After the initial setup, start n8n in production mode:
+
+```bash
+pnpm start
+```
+
+n8n will be available at `http://localhost:5678`
+
+## Development Mode
+
+For active development with hot-reload, use development mode:
+
+### Full Stack Development
+
+```bash
+pnpm dev
+```
+
+This starts all packages in watch mode with automatic rebuilding and hot-reload.
+
+<Warning>
+**Performance impact:** Full development mode runs multiple processes in parallel:
+- TypeScript compilation for each package
+- File watchers monitoring source files
+- Nodemon restarting the backend
+- Vite dev server with HMR for frontend
+- Build processes for various packages
+
+This can consume significant CPU and memory. See [Selective Development](#selective-development) for optimized workflows.
+</Warning>
+
+### Selective Development
+
+Run only the packages you're actively working on for better performance:
+
+<Accordion title="Backend-only development">
+```bash
+pnpm dev:be
+```
+
+Excludes frontend packages like editor-ui and design-system.
+</Accordion>
+
+<Accordion title="Frontend-only development">
+```bash
+pnpm dev:fe
+```
+
+Runs editor-ui and design-system development servers.
+</Accordion>
+
+<Accordion title="AI/LangChain nodes development">
+```bash
+pnpm dev:ai
+```
+
+Runs only essential packages for AI node development.
+</Accordion>
+
+### Most Common Development Workflow
+
+Many n8n developers use this two-terminal setup:
+
+<CodeGroup>
+
+```bash Terminal 1: Backend (CLI)
+cd packages/cli
+pnpm dev
+```
+
+```bash Terminal 2: Frontend (Editor UI)
+cd packages/frontend/editor-ui
+pnpm dev
+```
+
+</CodeGroup>
+
+<Note>
+If you modify code outside `packages/cli` or `packages/frontend/editor-ui`, run `pnpm build` to rebuild those packages.
+</Note>
+
+### Custom Node Development
+
+For developing custom nodes with hot-reload:
+
+<CodeGroup>
+
+```bash Terminal 1: Watch nodes package
+cd packages/nodes-base
+pnpm dev
+```
+
+```bash Terminal 2: CLI with hot reload
+cd packages/cli
+N8N_DEV_RELOAD=true pnpm dev
+```
+
+</CodeGroup>
+
+<Warning>
+**Performance considerations:**
+
+The `N8N_DEV_RELOAD` feature watches potentially thousands of files. On resource-constrained systems, consider developing without hot reload and manually restarting when needed.
+</Warning>
+
+### Testing with Different Configurations
+
+n8n uses [Testcontainers](https://testcontainers.com/) to quickly spin up local instances with different configurations:
+
+<Steps>
+
+<Step title="Build a Docker image">
+Build from your branch:
+
+```bash
+pnpm build:docker
+```
+
+Or use an existing image:
+
+```bash
+export N8N_DOCKER_IMAGE=n8nio/n8n:latest
+```
+</Step>
+
+<Step title="Run a stack">
+<CodeGroup>
+
+```bash SQLite
+pnpm --filter n8n-containers stack:sqlite
+```
+
+```bash PostgreSQL
+pnpm --filter n8n-containers stack:postgres
+```
+
+```bash Queue Mode
+pnpm --filter n8n-containers stack:queue
+```
+
+```bash Multi-Main (HA)
+pnpm --filter n8n-containers stack:multi-main
+```
+
+</CodeGroup>
+</Step>
+
+<Step title="Customize or scale (optional)">
+Customize with environment variables:
+
+```bash
+pnpm --filter n8n-containers stack --env N8N_ENABLED_MODULES=insights
+```
+
+Scale up workers:
+
+```bash
+pnpm --filter n8n-containers stack --queue --mains 4 --workers 20
+```
+</Step>
+
+</Steps>
+
+<Note>
+Each instance gets its own port. Multi-main stacks use a load balancer by default. See `packages/testing/containers/README.md` for more details.
+</Note>
+
+## Testing with Clean Database
+
+To test features with a fresh n8n instance without losing your existing setup, use a different user folder:
+
+```bash
+N8N_USER_FOLDER=~/.n8n-test pnpm --filter n8n start
+```
+
+Each folder maintains its own database, settings, and workflows.
+
+## Troubleshooting
+
+<Accordion title="Build fails with dependency errors">
+1. Clear node_modules and reinstall:
+   ```bash
+   pnpm reset
+   pnpm install
+   pnpm build
+   ```
+
+2. Ensure you're using the correct Node.js and pnpm versions:
+   ```bash
+   node --version  # Should be 24.x+
+   pnpm --version  # Should be 10.22.0+
+   ```
+</Accordion>
+
+<Accordion title="Port 5678 is already in use">
+Change the port with an environment variable:
+
+```bash
+N8N_PORT=5679 pnpm start
+```
+</Accordion>
+
+<Accordion title="Hot reload not working">
+Ensure you're using `N8N_DEV_RELOAD=true` and that the relevant packages are running in watch mode:
+
+```bash
+cd packages/nodes-base && pnpm dev  # Terminal 1
+cd packages/cli && N8N_DEV_RELOAD=true pnpm dev  # Terminal 2
+```
+</Accordion>
+
+<Accordion title="Docker alternatives (Podman, Colima)">
+Testcontainers requires additional configuration for Docker alternatives:
+
+- **Podman:** Follow [this guide](https://podman-desktop.io/tutorial/testcontainers-with-podman)
+- **Colima:** Set environment variables as described [here](https://node.testcontainers.org/supported-container-runtimes/#colima)
+</Accordion>
+
+## Next Steps
+
+- Learn about [n8n's architecture](/contributing/architecture)
+- Understand the [testing practices](/contributing/testing)
+- Review [contribution guidelines](/contributing/guidelines) before submitting PRs

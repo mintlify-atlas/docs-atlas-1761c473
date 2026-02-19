@@ -1,0 +1,611 @@
+---
+title: Docker Deployment
+description: Deploy n8n using Docker and Docker Compose with production-ready configurations and best practices.
+---
+
+Docker is the recommended way to deploy n8n, providing a consistent environment and easy updates. This guide covers everything from simple deployments to production-ready setups.
+
+## Quick Start
+
+### Simple Docker Run
+
+The fastest way to get n8n running:
+
+<Steps>
+  <Step title="Create a Docker volume">
+    ```bash
+    docker volume create n8n_data
+    ```
+    
+    This persists your workflows, credentials, and settings between container restarts.
+  </Step>
+  
+  <Step title="Run n8n container">
+    ```bash
+    docker run -it --rm \
+      --name n8n \
+      -p 5678:5678 \
+      -v n8n_data:/home/node/.n8n \
+      ghcr.io/n8n-io/n8n
+    ```
+  </Step>
+  
+  <Step title="Access n8n">
+    Open your browser to [http://localhost:5678](http://localhost:5678)
+  </Step>
+</Steps>
+
+<Warning>
+  The `/home/node/.n8n` folder contains critical data including:
+  - Encryption key for credentials
+  - Webhook URLs
+  - SQLite database (default)
+  - User settings and configuration
+  
+  **Always persist this folder** or your credentials cannot be decrypted after restart!
+</Warning>
+
+## Docker Compose Deployments
+
+### Single Instance with PostgreSQL
+
+A production-ready single instance setup:
+
+<CodeGroup>
+```yaml docker-compose.yml
+version: '3.8'
+
+volumes:
+  n8n_data:
+  postgres_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U n8n']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: ghcr.io/n8n-io/n8n:latest
+    restart: unless-stopped
+    ports:
+      - 5678:5678
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${N8N_HOST}/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+```
+
+```bash .env
+# Database credentials
+POSTGRES_PASSWORD=your-secure-database-password
+
+# n8n configuration
+N8N_ENCRYPTION_KEY=your-secure-encryption-key-min-10-chars
+N8N_HOST=your-domain.com
+```
+</CodeGroup>
+
+<Note>
+  Generate a secure encryption key:
+  ```bash
+  openssl rand -base64 32
+  ```
+  
+  **Store this key securely!** If lost, you cannot decrypt existing credentials.
+</Note>
+
+### With External Task Runners
+
+Deploy n8n with isolated task runners for enhanced security:
+
+<CodeGroup>
+```yaml docker-compose.yml
+version: '3.8'
+
+volumes:
+  n8n_data:
+  postgres_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U n8n']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: ghcr.io/n8n-io/n8n:latest
+    restart: unless-stopped
+    ports:
+      - 5678:5678
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Task Runner configuration
+      - N8N_RUNNERS_MODE=external
+      - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+      - N8N_RUNNERS_AUTH_TOKEN=${RUNNERS_AUTH_TOKEN}
+      - N8N_RUNNERS_MAX_CONCURRENCY=10
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  n8n-runner:
+    image: ghcr.io/n8n-io/runners:latest
+    restart: unless-stopped
+    environment:
+      - N8N_RUNNERS_TASK_BROKER_URI=http://n8n:5679
+      - N8N_RUNNERS_AUTH_TOKEN=${RUNNERS_AUTH_TOKEN}
+    depends_on:
+      n8n:
+        condition: service_healthy
+    # Scale runners as needed
+    deploy:
+      replicas: 2
+```
+
+```bash .env
+POSTGRES_PASSWORD=your-secure-database-password
+N8N_ENCRYPTION_KEY=your-secure-encryption-key
+RUNNERS_AUTH_TOKEN=your-secure-runner-token
+```
+</CodeGroup>
+
+### Queue Mode (Scaling Setup)
+
+Deploy n8n in queue mode with Redis and multiple workers:
+
+<CodeGroup>
+```yaml docker-compose.yml
+version: '3.8'
+
+volumes:
+  n8n_data:
+  postgres_data:
+  redis_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U n8n']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:6.2.14-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  n8n:
+    image: ghcr.io/n8n-io/n8n:latest
+    restart: unless-stopped
+    ports:
+      - 5678:5678
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Queue mode configuration
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_DB=0
+      # Metrics
+      - N8N_METRICS=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  n8n-worker:
+    image: ghcr.io/n8n-io/n8n:latest
+    restart: unless-stopped
+    command: worker
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Queue mode configuration
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+      # Worker concurrency
+      - N8N_CONCURRENCY_PRODUCTION_LIMIT=10
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Scale workers as needed
+    deploy:
+      replicas: 2
+```
+
+```bash .env
+POSTGRES_PASSWORD=your-secure-database-password
+N8N_ENCRYPTION_KEY=your-secure-encryption-key
+```
+</CodeGroup>
+
+<Note>
+  **Worker Scaling**: Adjust `deploy.replicas` based on your execution volume. Monitor CPU and memory usage to determine the optimal number of workers.
+</Note>
+
+## Docker Image Options
+
+n8n provides multiple Docker images:
+
+<Tabs>
+  <Tab title="Main Images">
+    ### ghcr.io/n8n-io/n8n
+    
+    Official n8n image from GitHub Container Registry.
+    
+    **Tags:**
+    - `latest` - Latest stable release
+    - `1.x.x` - Specific version (e.g., `1.25.0`)
+    - `next` - Latest unstable/beta release
+    
+    ```bash
+    # Pull latest stable
+    docker pull ghcr.io/n8n-io/n8n:latest
+    
+    # Pull specific version
+    docker pull ghcr.io/n8n-io/n8n:1.25.0
+    
+    # Pull next/beta
+    docker pull ghcr.io/n8n-io/n8n:next
+    ```
+  </Tab>
+  
+  <Tab title="Task Runners">
+    ### ghcr.io/n8n-io/runners
+    
+    Isolated task runner image for external mode.
+    
+    ```bash
+    docker pull ghcr.io/n8n-io/runners:latest
+    ```
+    
+    **Use when:**
+    - Enhanced security isolation needed
+    - Independent resource scaling required
+    - Running untrusted workflow code
+  </Tab>
+  
+  <Tab title="Custom Builds">
+    ### Building from Source
+    
+    Build n8n from source for custom modifications:
+    
+    ```bash
+    # Clone repository
+    git clone https://github.com/n8n-io/n8n.git
+    cd n8n
+    
+    # Build (includes compilation + Docker image)
+    pnpm build:docker
+    ```
+    
+    <Warning>
+      Building from source requires pre-compilation. See `/home/daytona/workspace/source/docker/images/n8n/Dockerfile` for details.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Environment Variables for Docker
+
+Key environment variables for Docker deployments:
+
+<Accordion title="Database Configuration">
+  ```bash
+  # PostgreSQL (recommended for production)
+  DB_TYPE=postgresdb
+  DB_POSTGRESDB_HOST=postgres
+  DB_POSTGRESDB_PORT=5432
+  DB_POSTGRESDB_DATABASE=n8n
+  DB_POSTGRESDB_USER=n8n
+  DB_POSTGRESDB_PASSWORD=secure-password
+  DB_POSTGRESDB_SCHEMA=public
+  
+  # SQLite (default, development only)
+  DB_TYPE=sqlite
+  DB_SQLITE_DATABASE=database.sqlite
+  ```
+</Accordion>
+
+<Accordion title="Queue Mode (Redis)">
+  ```bash
+  EXECUTIONS_MODE=queue
+  QUEUE_BULL_REDIS_HOST=redis
+  QUEUE_BULL_REDIS_PORT=6379
+  QUEUE_BULL_REDIS_DB=0
+  QUEUE_BULL_REDIS_PASSWORD=redis-password  # if using auth
+  QUEUE_HEALTH_CHECK_ACTIVE=true
+  ```
+</Accordion>
+
+<Accordion title="Task Runners">
+  ```bash
+  # n8n main process
+  N8N_RUNNERS_MODE=external
+  N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+  N8N_RUNNERS_BROKER_PORT=5679
+  N8N_RUNNERS_AUTH_TOKEN=your-secure-token
+  N8N_RUNNERS_MAX_CONCURRENCY=10
+  
+  # Runner process
+  N8N_RUNNERS_TASK_BROKER_URI=http://n8n:5679
+  N8N_RUNNERS_AUTH_TOKEN=your-secure-token
+  ```
+</Accordion>
+
+<Accordion title="Security & Access">
+  ```bash
+  N8N_ENCRYPTION_KEY=your-secure-key-min-10-chars
+  N8N_HOST=your-domain.com
+  N8N_PROTOCOL=https
+  N8N_PORT=5678
+  WEBHOOK_URL=https://your-domain.com/
+  ```
+</Accordion>
+
+## Volume Mounts
+
+<Warning>
+  **Critical Data Locations**
+  
+  The `/home/node/.n8n` directory contains:
+  - `config` - Instance configuration
+  - `database.sqlite` - Default database (if using SQLite)
+  - `.n8n.settings.json` - Encryption key and settings
+  
+  **Always mount this directory** to preserve data between restarts!
+</Warning>
+
+### Recommended Mounts
+
+```yaml
+volumes:
+  # Primary data directory (required)
+  - n8n_data:/home/node/.n8n
+  
+  # Custom certificates (optional)
+  - ./custom-certs:/opt/custom-certificates:ro
+  
+  # Custom nodes (optional)
+  - ./custom-nodes:/home/node/.n8n/custom
+```
+
+## Updating n8n
+
+<Steps>
+  <Step title="Pull the latest image">
+    ```bash
+    docker compose pull
+    ```
+  </Step>
+  
+  <Step title="Stop and remove old containers">
+    ```bash
+    docker compose down
+    ```
+    
+    <Note>
+      This preserves your data volumes. Your workflows and credentials remain safe.
+    </Note>
+  </Step>
+  
+  <Step title="Start with new image">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+  
+  <Step title="Verify the update">
+    ```bash
+    docker compose logs -f n8n
+    ```
+    
+    Check for successful startup and database migrations.
+  </Step>
+</Steps>
+
+<Warning>
+  **Before Updating:**
+  
+  1. Check [Breaking Changes](https://github.com/n8n-io/n8n/blob/master/packages/cli/BREAKING-CHANGES.md)
+  2. Backup your database and encryption key
+  3. Test updates in a staging environment first
+  4. Plan for brief downtime during the update
+</Warning>
+
+## Health Checks
+
+n8n exposes a health check endpoint at `/healthz`:
+
+```yaml
+healthcheck:
+  test: ['CMD-SHELL', 'wget --spider -q http://localhost:5678/healthz || exit 1']
+  interval: 5s
+  timeout: 5s
+  retries: 10
+  start_period: 30s
+```
+
+<Accordion title="Health Check Components">
+  The health endpoint checks:
+  - Database connectivity
+  - Redis connectivity (queue mode)
+  - Application readiness
+  
+  Returns HTTP 200 when healthy, 503 when unhealthy.
+</Accordion>
+
+## Timezone Configuration
+
+Configure timezone for scheduled workflows:
+
+```bash
+# Set both for consistency
+docker run \
+  -e GENERIC_TIMEZONE="Europe/Berlin" \
+  -e TZ="Europe/Berlin" \
+  ghcr.io/n8n-io/n8n
+```
+
+<Note>
+  - `GENERIC_TIMEZONE` - Used by n8n's Schedule node
+  - `TZ` - System timezone for container commands
+</Note>
+
+## Custom SSL Certificates
+
+Trust custom SSL certificates:
+
+```yaml
+services:
+  n8n:
+    volumes:
+      - ./custom-certs:/opt/custom-certificates:ro
+    environment:
+      - NODE_OPTIONS=--use-openssl-ca
+      - SSL_CERT_DIR=/opt/custom-certificates
+```
+
+The entrypoint script automatically runs `c_rehash` on the certificate directory.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container won't start">
+    ```bash
+    # Check logs
+    docker compose logs -f n8n
+    
+    # Common issues:
+    # 1. Port 5678 already in use
+    # 2. Database connection failed
+    # 3. Invalid encryption key
+    # 4. Insufficient permissions
+    ```
+  </Accordion>
+  
+  <Accordion title="Cannot decrypt credentials">
+    This happens when:
+    - Encryption key changed or lost
+    - `/home/node/.n8n` volume not mounted
+    - Different encryption key between containers
+    
+    **Solution:** Ensure consistent `N8N_ENCRYPTION_KEY` and persistent volumes.
+  </Accordion>
+  
+  <Accordion title="Workers not picking up jobs">
+    ```bash
+    # Verify Redis connection
+    docker compose exec redis redis-cli ping
+    
+    # Check worker logs
+    docker compose logs -f n8n-worker
+    
+    # Verify same encryption key and database
+    docker compose exec n8n env | grep N8N_ENCRYPTION_KEY
+    docker compose exec n8n-worker env | grep N8N_ENCRYPTION_KEY
+    ```
+  </Accordion>
+  
+  <Accordion title="High memory usage">
+    ```yaml
+    # Set resource limits
+    services:
+      n8n:
+        deploy:
+          resources:
+            limits:
+              memory: 2G
+            reservations:
+              memory: 1G
+    ```
+    
+    Also consider:
+    - Reducing `N8N_CONCURRENCY_PRODUCTION_LIMIT`
+    - Adding more workers instead of increasing main process memory
+    - Enabling execution data pruning
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/hosting/configuration">
+    Deep dive into all configuration options
+  </Card>
+  <Card title="Scaling" icon="expand" href="/hosting/scaling">
+    Learn about scaling with queue mode
+  </Card>
+</CardGroup>

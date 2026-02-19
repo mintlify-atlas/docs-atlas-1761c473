@@ -1,0 +1,1018 @@
+---
+title: Trigger Nodes
+description: Learn about n8n trigger types - webhooks, polling triggers, schedule triggers, and manual triggers for workflow automation
+---
+
+# Trigger Nodes
+
+Trigger nodes are the starting point of every n8n workflow. They define **when** and **how** a workflow begins execution. Understanding the different trigger types is essential for building effective automation.
+
+## Trigger Types Overview
+
+<CardGroup cols={3}>
+  <Card title="Webhook Triggers" icon="webhook">
+    Instant execution when external service calls your URL
+  </Card>
+  <Card title="Polling Triggers" icon="rotate">
+    Periodic checks for new data or changes
+  </Card>
+  <Card title="Schedule Triggers" icon="clock">
+    Time-based execution on a schedule
+  </Card>
+</CardGroup>
+
+## Webhook Triggers
+
+Webhook triggers create HTTP endpoints that external services can call to start your workflow instantly. They are **event-driven** and execute immediately when triggered.
+
+### How Webhooks Work
+
+<Tabs>
+  <Tab title="Overview">
+    **Architecture:**
+    ```
+    External Service → HTTP POST → Webhook URL → Workflow Execution
+    ```
+
+    **Key Concepts:**
+    - **Test URL** - Used during workflow development
+    - **Production URL** - Used when workflow is active
+    - **Webhook Methods** - Lifecycle management (create, check, delete)
+    - **Authentication** - Built-in security options
+
+    **When to Use:**
+    - Real-time event processing
+    - Third-party service integrations
+    - Form submissions
+    - API endpoints
+    - IoT device events
+  </Tab>
+
+  <Tab title="Configuration">
+    **Basic Webhook Setup:**
+
+    ```json
+    {
+      "httpMethod": "POST",
+      "path": "user-signup",
+      "authentication": "headerAuth",
+      "responseMode": "onReceived",
+      "options": {
+        "rawBody": false,
+        "allowedIPs": "",
+        "ignoreBots": false
+      }
+    }
+    ```
+
+    **URLs Generated:**
+    ```
+    Test: https://your-n8n.com/webhook-test/user-signup
+    Production: https://your-n8n.com/webhook/user-signup
+    ```
+
+    **Authentication Options:**
+    - No authentication
+    - Basic Auth
+    - Header Auth
+    - Multiple headers
+    - Custom authentication
+  </Tab>
+
+  <Tab title="Response Configuration">
+    **Response Modes:**
+
+    **On Received (Immediate):**
+    ```json
+    {
+      "responseMode": "onReceived",
+      "responseCode": 200,
+      "responseData": "{
+        \"success\": true,
+        \"message\": \"Webhook received\"
+      }"
+    }
+    ```
+
+    **Last Node (Wait for workflow):**
+    ```json
+    {
+      "responseMode": "lastNode",
+      "options": {
+        "responseHeaders": {
+          "entries": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    }
+    ```
+
+    **Use RespondToWebhook Node:**
+    - Multiple response points
+    - Conditional responses
+    - Advanced control
+  </Tab>
+
+  <Tab title="Security">
+    **IP Allowlist:**
+    ```json
+    {
+      "options": {
+        "allowedIPs": "192.168.1.0/24,10.0.0.1"
+      }
+    }
+    ```
+
+    **Header Authentication:**
+    ```json
+    {
+      "authentication": "headerAuth",
+      "credentials": {
+        "name": "Header Auth",
+        "headerName": "X-API-Key",
+        "headerValue": "your-secret-key"
+      }
+    }
+    ```
+
+    **Bot Detection:**
+    ```json
+    {
+      "options": {
+        "ignoreBots": true  // Reject known bot user agents
+      }
+    }
+    ```
+
+    **CORS:**
+    - Webhooks support CORS by default
+    - Configure allowed origins if needed
+    - Handle preflight requests
+  </Tab>
+</Tabs>
+
+### Service-Specific Webhook Triggers
+
+Many integrations provide dedicated webhook triggers with automatic registration:
+
+<Accordion title="GitHub Trigger">
+  **Webhook Events:**
+  - Push events
+  - Pull requests
+  - Issues
+  - Releases
+  - Branch/tag creation
+
+  **Automatic Setup:**
+  - Creates webhook in GitHub automatically
+  - Handles secret validation
+  - Cleans up on workflow deactivation
+
+  **Configuration:**
+  ```json
+  {
+    "owner": "myorg",
+    "repository": "myrepo",
+    "events": ["push", "pull_request"]
+  }
+  ```
+
+  **Implementation Note:**
+  Uses `webhookMethods` for lifecycle management:
+  - `checkExists()` - Verify webhook
+  - `create()` - Register webhook
+  - `delete()` - Remove webhook
+</Accordion>
+
+<Accordion title="Slack Trigger">
+  **Event Types:**
+  - New messages
+  - Reactions added
+  - User mentions
+  - Channel updates
+  - File shared
+
+  **Setup Requirements:**
+  1. Create Slack App
+  2. Enable Event Subscriptions
+  3. Add webhook URL
+  4. Subscribe to bot events
+
+  **Configuration:**
+  ```json
+  {
+    "event": "message",
+    "channel": "#general",
+    "resolve": "user"  // Resolve user IDs to objects
+  }
+  ```
+</Accordion>
+
+<Accordion title="Stripe Trigger">
+  **Webhook Events:**
+  - Payment succeeded
+  - Customer created
+  - Subscription updated
+  - Invoice paid
+  - Charge refunded
+
+  **Automatic Registration:**
+  - Creates endpoint in Stripe
+  - Validates webhook signatures
+  - Handles event types
+
+  **Configuration:**
+  ```json
+  {
+    "events": [
+      "payment_intent.succeeded",
+      "customer.subscription.created"
+    ]
+  }
+  ```
+</Accordion>
+
+<Accordion title="Microsoft Teams Trigger">
+  **Event Types:**
+  - Channel messages
+  - Team updates
+  - Meeting scheduled
+
+  **Implementation:**
+  ```typescript
+  webhookMethods = {
+    default: {
+      async checkExists(this: IHookFunctions) {
+        // Check if webhook exists
+      },
+      async create(this: IHookFunctions) {
+        // Create subscription
+      },
+      async delete(this: IHookFunctions) {
+        // Delete subscription
+      },
+    },
+  };
+  ```
+</Accordion>
+
+<Accordion title="WooCommerce Trigger">
+  **Webhook Topics:**
+  - Order created
+  - Order updated
+  - Product created
+  - Customer created
+
+  **Auto-configuration:**
+  - Registers webhook via WooCommerce API
+  - Sets delivery URL
+  - Configures topic and secret
+</Accordion>
+
+### Webhook Node Implementation
+
+The core Webhook node provides maximum flexibility:
+
+```typescript
+webhook(this: IWebhookFunctions) {
+  const req = this.getRequestObject();
+  const resp = this.getResponseObject();
+  const mode = this.getMode() === 'manual' ? 'test' : 'production';
+  
+  // Process incoming data
+  const body = req.body;
+  const headers = req.headers;
+  const query = req.query;
+  
+  // Return data to workflow
+  return {
+    workflowData: [
+      this.helpers.returnJsonArray(body)
+    ]
+  };
+}
+```
+
+## Polling Triggers
+
+Polling triggers periodically check external services for new data or changes. They execute at regular intervals and trigger workflows when new items are detected.
+
+### How Polling Works
+
+<Tabs>
+  <Tab title="Polling Mechanism">
+    **Execution Flow:**
+    ```
+    Schedule Check → API Request → Compare with Last State → Trigger if Changed
+    ```
+
+    **State Management:**
+    ```typescript
+    async poll(this: IPollFunctions) {
+      const pollData = this.getWorkflowStaticData('node');
+      const lastCheck = pollData.lastItemDate || new Date(0);
+      
+      // Fetch new items
+      const newItems = await fetchNewItems(lastCheck);
+      
+      if (newItems.length > 0) {
+        // Update state
+        pollData.lastItemDate = newItems[0].date;
+        
+        // Return new items
+        return [this.helpers.returnJsonArray(newItems)];
+      }
+      
+      return null;  // No new items
+    }
+    ```
+
+    **Key Concepts:**
+    - Uses `polling: true` in node description
+    - Implements `poll()` function
+    - Stores state in workflow static data
+    - Returns `null` when no new data
+  </Tab>
+
+  <Tab title="Configuration">
+    **Poll Times Configuration:**
+
+    n8n automatically adds polling interval settings:
+
+    - Every minute
+    - Every 5 minutes
+    - Every 10 minutes
+    - Every 15 minutes
+    - Every 30 minutes
+    - Every hour
+    - Every 12 hours
+    - Every day
+    - Custom interval
+
+    **Implementation:**
+    ```json
+    {
+      "polling": true
+    }
+    ```
+
+    n8n adds the poll configuration automatically.
+  </Tab>
+
+  <Tab title="Best Practices">
+    **State Management:**
+    ```typescript
+    // Store last processed item
+    const pollData = this.getWorkflowStaticData('node');
+    
+    // First run
+    if (!pollData.lastItemDate) {
+      pollData.lastItemDate = new Date().toISOString();
+      // Return only one item on first run
+      if (items.length > 0) {
+        return [this.helpers.returnJsonArray([items[0]])];
+      }
+    }
+    ```
+
+    **Rate Limiting:**
+    - Respect API rate limits
+    - Use appropriate poll intervals
+    - Handle 429 responses
+    - Implement exponential backoff
+
+    **Error Handling:**
+    ```typescript
+    try {
+      const newItems = await api.getNewItems();
+      return [this.helpers.returnJsonArray(newItems)];
+    } catch (error) {
+      if (error.statusCode === 429) {
+        // Rate limited - return null, will retry next interval
+        return null;
+      }
+      throw error;
+    }
+    ```
+
+    **Manual Execution:**
+    ```typescript
+    if (this.getMode() === 'manual') {
+      // Return sample data for testing
+      return [this.helpers.returnJsonArray([latestItem])];
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Common Polling Triggers
+
+<Accordion title="RSS Feed Trigger">
+  **Implementation:**
+  ```typescript
+  polling: true
+  
+  async poll(this: IPollFunctions) {
+    const pollData = this.getWorkflowStaticData('node');
+    const feedUrl = this.getNodeParameter('feedUrl') as string;
+    
+    const lastDate = pollData.lastItemDate || new Date(0);
+    const parser = new Parser();
+    const feed = await parser.parseURL(feedUrl);
+    
+    // Filter new items
+    const newItems = feed.items.filter(item => 
+      new Date(item.isoDate) > new Date(lastDate)
+    );
+    
+    if (newItems.length > 0) {
+      pollData.lastItemDate = newItems[0].isoDate;
+      return [this.helpers.returnJsonArray(newItems)];
+    }
+    
+    return null;
+  }
+  ```
+
+  **Use Cases:**
+  - Blog updates
+  - News feeds
+  - Podcast episodes
+  - Content aggregation
+</Accordion>
+
+<Accordion title="Google Sheets Trigger">
+  **Trigger Events:**
+  - Row added
+  - Row updated
+  - Row added or updated
+
+  **Implementation:**
+  ```typescript
+  polling: true
+
+  async poll(this: IPollFunctions) {
+    const documentId = this.getNodeParameter('documentId', '', { extractValue: true });
+    const sheetName = this.getNodeParameter('sheetName', '', { extractValue: true });
+    const event = this.getNodeParameter('event');
+    
+    const pollData = this.getWorkflowStaticData('node');
+    
+    // Get current sheet revision
+    const currentRevision = await getRevisionFile(documentId);
+    const lastRevision = pollData.lastRevision;
+    
+    if (lastRevision !== currentRevision) {
+      // Compare changes
+      const changes = compareRevisions(lastRevision, currentRevision);
+      pollData.lastRevision = currentRevision;
+      
+      return [this.helpers.returnJsonArray(changes)];
+    }
+    
+    return null;
+  }
+  ```
+
+  **Features:**
+  - Revision-based detection
+  - Row-level change tracking
+  - Handles updates and additions
+</Accordion>
+
+<Accordion title="Gmail Trigger">
+  **Configuration:**
+  ```json
+  {
+    "event": "messageReceived",
+    "filters": {
+      "from": "notifications@service.com",
+      "subject": "Alert:",
+      "includeAttachments": true
+    },
+    "labelIds": ["INBOX"]
+  }
+  ```
+
+  **State Management:**
+  - Tracks last message ID
+  - Handles pagination
+  - Processes attachments
+
+  **Use Cases:**
+  - Email automation
+  - Attachment processing
+  - Notification routing
+</Accordion>
+
+<Accordion title="Salesforce Trigger">
+  **SOQL Query Polling:**
+  ```sql
+  SELECT Id, Name, Email, CreatedDate
+  FROM Lead
+  WHERE CreatedDate > :lastCheck
+  ORDER BY CreatedDate DESC
+  ```
+
+  **Implementation:**
+  ```typescript
+  async poll(this: IPollFunctions) {
+    const pollData = this.getWorkflowStaticData('node');
+    const lastCheck = pollData.lastCheck || new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const query = `SELECT * FROM Lead WHERE CreatedDate > ${lastCheck.toISOString()}`;
+    const results = await salesforceApi.query(query);
+    
+    if (results.records.length > 0) {
+      pollData.lastCheck = new Date();
+      return [this.helpers.returnJsonArray(results.records)];
+    }
+    
+    return null;
+  }
+  ```
+</Accordion>
+
+<Accordion title="Airtable Trigger">
+  **Polling Configuration:**
+  ```json
+  {
+    "base": "appXXXXXXXXXXXXXX",
+    "table": "Tasks",
+    "triggerField": "Last Modified",
+    "pollInterval": 300000  // 5 minutes
+  }
+  ```
+
+  **Features:**
+  - Field-based change detection
+  - View-specific polling
+  - Formula field support
+</Accordion>
+
+<Accordion title="Notion Trigger">
+  **Database Polling:**
+  ```typescript
+  async poll(this: IPollFunctions) {
+    const databaseId = this.getNodeParameter('databaseId');
+    const pollData = this.getWorkflowStaticData('node');
+    
+    // Query database with last_edited_time filter
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      filter: {
+        timestamp: 'last_edited_time',
+        last_edited_time: {
+          after: pollData.lastEditedTime || new Date(0)
+        }
+      }
+    });
+    
+    if (response.results.length > 0) {
+      pollData.lastEditedTime = new Date();
+      return [this.helpers.returnJsonArray(response.results)];
+    }
+    
+    return null;
+  }
+  ```
+</Accordion>
+
+## Schedule Triggers
+
+Schedule triggers execute workflows based on time patterns - perfect for recurring tasks and maintenance operations.
+
+### Schedule Trigger Node
+
+<Tabs>
+  <Tab title="Overview">
+    **Schedule Types:**
+    - **Simple Intervals** - Seconds, minutes, hours, days, weeks, months
+    - **Specific Times** - Daily at specific hour
+    - **Day of Week** - Weekly schedules
+    - **Custom Cron** - Advanced patterns
+
+    **Features:**
+    - Multiple schedules per trigger
+    - Timezone support
+    - Between times constraints
+    - Complex recurrence rules
+
+    **Implementation:**
+    ```typescript
+    async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
+      const triggerTimes = this.getNodeParameter('rule');
+      
+      const expressions = triggerTimes.interval.map(toCronExpression);
+      
+      const executeTrigger = () => {
+        this.emit([this.helpers.returnJsonArray([{}])]);
+      };
+      
+      expressions.forEach(expression => 
+        this.helpers.registerCron({ expression }, executeTrigger)
+      );
+      
+      return {
+        manualTriggerFunction: async () => executeTrigger()
+      };
+    }
+    ```
+  </Tab>
+
+  <Tab title="Simple Intervals">
+    **Every 5 Minutes:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "minutes",
+            "minutesInterval": 5
+          }
+        ]
+      }
+    }
+    ```
+
+    **Every Hour:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "hours",
+            "hoursInterval": 1,
+            "triggerAtMinute": 0
+          }
+        ]
+      }
+    }
+    ```
+
+    **Every Day at 9 AM:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "days",
+            "daysInterval": 1,
+            "triggerAtHour": 9,
+            "triggerAtMinute": 0
+          }
+        ]
+      }
+    }
+    ```
+
+    **Every Week on Monday:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "weeks",
+            "weeksInterval": 1,
+            "triggerAtDay": [1],  // Monday
+            "triggerAtHour": 8,
+            "triggerAtMinute": 0
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Business Hours">
+    **Weekdays 9-5:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "hours",
+            "hoursInterval": 1,
+            "triggerAtMinute": 0,
+            "betweenHours": true,
+            "betweenHoursStart": 9,
+            "betweenHoursEnd": 17,
+            "dayOfWeek": [1, 2, 3, 4, 5]  // Mon-Fri
+          }
+        ]
+      }
+    }
+    ```
+
+    **Every 30 Minutes During Work Hours:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "minutes",
+            "minutesInterval": 30,
+            "betweenHours": true,
+            "betweenHoursStart": 9,
+            "betweenHoursEnd": 17,
+            "dayOfWeek": [1, 2, 3, 4, 5]
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Cron Expressions">
+    **Cron Format:**
+    ```
+    ┌────────────── second (0-59)
+    │ ┌──────────── minute (0-59)
+    │ │ ┌────────── hour (0-23)
+    │ │ │ ┌──────── day of month (1-31)
+    │ │ │ │ ┌────── month (1-12)
+    │ │ │ │ │ ┌──── day of week (0-6, 0=Sunday)
+    │ │ │ │ │ │
+    * * * * * *
+    ```
+
+    **Examples:**
+
+    **Every weekday at 8:30 AM:**
+    ```json
+    {
+      "rule": {
+        "interval": [
+          {
+            "field": "cronExpression",
+            "expression": "0 30 8 * * 1-5"
+          }
+        ]
+      }
+    }
+    ```
+
+    **Every 15 minutes during business hours:**
+    ```
+    0 */15 9-17 * * 1-5
+    ```
+
+    **First day of every month at midnight:**
+    ```
+    0 0 0 1 * *
+    ```
+
+    **Every Monday and Friday at 6 PM:**
+    ```
+    0 0 18 * * 1,5
+    ```
+  </Tab>
+</Tabs>
+
+### Common Schedule Patterns
+
+<Accordion title="Data Backups">
+  **Daily at 2 AM:**
+  ```json
+  {
+    "rule": {
+      "interval": [
+        {
+          "field": "days",
+          "daysInterval": 1,
+          "triggerAtHour": 2,
+          "triggerAtMinute": 0
+        }
+      ]
+    }
+  }
+  ```
+
+  **Use Case:** Database backups, data exports, cleanup tasks
+</Accordion>
+
+<Accordion title="Report Generation">
+  **Weekly on Sunday at 11 PM:**
+  ```json
+  {
+    "rule": {
+      "interval": [
+        {
+          "field": "weeks",
+          "weeksInterval": 1,
+          "triggerAtDay": [0],  // Sunday
+          "triggerAtHour": 23,
+          "triggerAtMinute": 0
+        }
+      ]
+    }
+  }
+  ```
+
+  **Use Case:** Weekly reports, analytics summaries, invoicing
+</Accordion>
+
+<Accordion title="Monitoring">
+  **Every 5 Minutes:**
+  ```json
+  {
+    "rule": {
+      "interval": [
+        {
+          "field": "minutes",
+          "minutesInterval": 5
+        }
+      ]
+    }
+  }
+  ```
+
+  **Use Case:** Service health checks, API monitoring, uptime tracking
+</Accordion>
+
+<Accordion title="Monthly Maintenance">
+  **First Monday of Every Month:**
+  ```
+  0 0 8 1-7 * 1
+  ```
+
+  **Use Case:** Monthly cleanups, license checks, subscription renewals
+</Accordion>
+
+## Manual Triggers
+
+Some triggers support manual execution for testing:
+
+<Card title="Manual Trigger Node" icon="hand">
+  **Purpose:** 
+  - Canvas-based testing
+  - Manual workflow execution
+  - Development and debugging
+
+  **Implementation:**
+  ```typescript
+  async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
+    const executeTrigger = () => {
+      this.emit([this.helpers.returnJsonArray([{ manual: true }])]);
+    };
+    
+    return {
+      manualTriggerFunction: async () => executeTrigger()
+    };
+  }
+  ```
+
+  **Features:**
+  - Instant execution from canvas
+  - No external dependencies
+  - Sample data generation
+</Card>
+
+## Generic Trigger Interface
+
+Some nodes implement custom trigger logic:
+
+<Accordion title="MQTT Trigger">
+  **Generic Trigger Implementation:**
+  ```typescript
+  async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
+    const protocol = this.getNodeParameter('protocol');
+    const host = this.getNodeParameter('host');
+    const port = this.getNodeParameter('port');
+    const topics = this.getNodeParameter('topics');
+    
+    const client = mqtt.connect(`${protocol}://${host}:${port}`);
+    
+    client.on('connect', () => {
+      topics.forEach(topic => client.subscribe(topic));
+    });
+    
+    client.on('message', (topic, message) => {
+      this.emit([this.helpers.returnJsonArray([{
+        topic,
+        message: message.toString()
+      }])]);
+    });
+    
+    async function closeFunction() {
+      client.end();
+    }
+    
+    return {
+      closeFunction
+    };
+  }
+  ```
+
+  **Use Cases:**
+  - Message queue subscriptions
+  - WebSocket connections
+  - Database change streams
+  - Custom event listeners
+</Accordion>
+
+<Accordion title="Redis Trigger">
+  **Subscribe to Pub/Sub:**
+  ```typescript
+  async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
+    const channels = this.getNodeParameter('channels');
+    
+    const subscriber = redis.createClient();
+    await subscriber.connect();
+    
+    await subscriber.subscribe(channels, (message, channel) => {
+      this.emit([this.helpers.returnJsonArray([{
+        channel,
+        message: JSON.parse(message)
+      }])]);
+    });
+    
+    return {
+      closeFunction: async () => subscriber.quit()
+    };
+  }
+  ```
+</Accordion>
+
+## Choosing the Right Trigger
+
+<Tabs>
+  <Tab title="Decision Matrix">
+    | Requirement | Trigger Type |
+    |-------------|-------------|
+    | Real-time events from external service | Webhook |
+    | Check for new emails/messages | Polling |
+    | Run on a schedule | Schedule |
+    | Manual testing | Manual |
+    | Database change streams | Generic (custom) |
+    | Message queue | Generic (custom) |
+    | Form submissions | Webhook |
+    | RSS/Feed monitoring | Polling (RSS) |
+    | Time-based reports | Schedule |
+    | Service supports webhooks | Webhook |
+  </Tab>
+
+  <Tab title="Performance">
+    **Webhook Triggers:**
+    - Instant execution
+    - No polling overhead
+    - Event-driven
+    - Requires external service support
+
+    **Polling Triggers:**
+    - Delayed response (based on interval)
+    - API rate limits apply
+    - Works with any API
+    - Resource overhead from regular checks
+
+    **Schedule Triggers:**
+    - Predictable execution
+    - No external dependencies
+    - Batch processing friendly
+    - Time-based only
+  </Tab>
+
+  <Tab title="Best Practices">
+    **Webhooks:**
+    - Always implement authentication
+    - Use IP allowlists when possible
+    - Validate webhook signatures
+    - Return responses quickly
+    - Use RespondToWebhook for long-running workflows
+
+    **Polling:**
+    - Use appropriate intervals
+    - Respect API rate limits
+    - Store state in workflow static data
+    - Handle first-run scenarios
+    - Return null when no new data
+
+    **Schedules:**
+    - Use timezone-aware times
+    - Avoid peak hours for heavy tasks
+    - Consider execution duration
+    - Use cron for complex patterns
+    - Test with manual execution first
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Action Nodes" icon="bolt" href="/integrations/actions">
+    Learn about data processing and transformation nodes
+  </Card>
+  <Card title="Popular Nodes" icon="star" href="/integrations/popular-nodes">
+    Explore commonly used integrations
+  </Card>
+  <Card title="Build Workflows" icon="diagram-project" href="/quickstart">
+    Create your first automated workflow
+  </Card>
+  <Card title="Webhook Guide" icon="webhook" href="/essentials/webhooks">
+    Deep dive into webhook configuration
+  </Card>
+</CardGroup>

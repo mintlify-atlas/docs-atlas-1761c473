@@ -1,0 +1,591 @@
+---
+title: Execution Modes
+description: Understand the different execution modes in n8n - manual, trigger, webhook, worker - and how they affect workflow behavior
+---
+
+# Execution Modes
+
+n8n workflows can execute in different modes depending on how they are triggered. Each mode has unique characteristics that affect execution behavior, data flow, and error handling.
+
+## Overview of Execution Modes
+
+Execution modes are defined by the `WorkflowExecuteMode` type:
+
+```typescript
+// From execution-context.ts:33-44
+type WorkflowExecuteModeValues = 
+  | 'cli'          // Executed via CLI command
+  | 'error'        // Error workflow execution
+  | 'integrated'   // Embedded execution
+  | 'internal'     // Internal system execution
+  | 'manual'       // Test execution from UI
+  | 'retry'        // Retry after failure
+  | 'trigger'      // Triggered automatically
+  | 'webhook'      // Webhook request
+  | 'evaluation'   // Evaluation/testing mode
+  | 'chat';        // Chat interface
+```
+
+## Manual Mode
+
+Manual mode is used for testing workflows in the n8n editor.
+
+### Characteristics
+
+<Tabs>
+  <Tab title="Execution">
+    ```typescript
+    // Manual execution always starts from a trigger node
+    const mode: WorkflowExecuteMode = 'manual';
+    
+    // Workflow must have a manual trigger node
+    const manualTrigger: INode = {
+      name: 'Manual Trigger',
+      type: 'n8n-nodes-base.manualTrigger',
+      typeVersion: 1,
+      position: [250, 300],
+      parameters: {}
+    };
+    ```
+
+    **Key Points:**
+    - Executions are saved only if `saveManualExecutions` setting is enabled
+    - Full execution data is available in the UI
+    - Debugging information is more detailed
+  </Tab>
+
+  <Tab title="Trigger Behavior">
+    ```typescript
+    // From triggers-and-pollers.ts:45-86
+    async runTrigger(
+      workflow: Workflow,
+      node: INode,
+      mode: WorkflowExecuteMode
+    ) {
+      if (mode === 'manual') {
+        // Manual mode adds special promise resolution
+        const triggerResponse = await nodeType.trigger.call(triggerFunctions);
+        
+        // Wait for first data emission
+        triggerResponse.manualTriggerResponse = new Promise((resolve, reject) => {
+          triggerFunctions.emit = (data) => {
+            resolve(data);  // Resolve when data arrives
+          };
+          
+          triggerFunctions.emitError = (error) => {
+            reject(error);  // Reject on error
+          };
+        });
+        
+        return triggerResponse;
+      }
+    }
+    ```
+
+    **Behavior:**
+    - Trigger nodes wait for first data emission
+    - UI displays "Waiting for trigger event"
+    - Timeout can cancel waiting execution
+  </Tab>
+
+  <Tab title="Data Handling">
+    ```typescript
+    // Manual executions can use pinned data
+    const pinData: IPinData = {
+      'HTTP Request': [
+        {
+          json: { id: 1, name: 'Test' }
+        }
+      ]
+    };
+    
+    // Pinned data overrides actual execution
+    const workflow = new Workflow({
+      // ... other params
+      pinData
+    });
+    ```
+
+    **Features:**
+    - Pin data to test specific scenarios
+    - Edit input data between runs
+    - Inspect intermediate node outputs
+  </Tab>
+</Tabs>
+
+### Use Cases
+
+- Testing workflow logic before activation
+- Debugging node configurations
+- Validating expressions with sample data
+- Developing new integrations
+
+## Trigger Mode
+
+Trigger mode is used when workflows are activated and run automatically.
+
+### Characteristics
+
+```typescript
+const mode: WorkflowExecuteMode = 'trigger';
+
+// Trigger nodes run continuously
+const triggerResponse = await nodeType.trigger.call(triggerFunctions);
+
+// Response includes cleanup function
+interface ITriggerResponse {
+  closeFunction?: () => Promise<void>;
+  manualTriggerFunction?: () => Promise<void>;
+}
+```
+
+### Trigger Types
+
+<Steps>
+  <Step title="Event-Based Triggers">
+    Listen for external events:
+
+    ```typescript
+    // Webhook trigger
+    const webhook: INode = {
+      name: 'Webhook',
+      type: 'n8n-nodes-base.webhook',
+      parameters: {
+        path: 'my-webhook',
+        httpMethod: 'POST'
+      }
+    };
+    
+    // Activated: http://n8n.instance/webhook/my-webhook
+    ```
+
+    **Examples:**
+    - Webhook triggers (HTTP requests)
+    - Form triggers (form submissions)
+    - Chat triggers (chat messages)
+  </Step>
+
+  <Step title="Schedule-Based Triggers">
+    Run on a schedule:
+
+    ```typescript
+    // Schedule trigger
+    const schedule: INode = {
+      name: 'Schedule',
+      type: 'n8n-nodes-base.scheduleTrigger',
+      parameters: {
+        rule: {
+          interval: [
+            {
+              field: 'hours',
+              hoursInterval: 1
+            }
+          ]
+        }
+      }
+    };
+    
+    // Runs every hour
+    ```
+
+    **Examples:**
+    - Cron schedules
+    - Interval-based execution
+    - Time-based triggers
+  </Step>
+
+  <Step title="Poll-Based Triggers">
+    Check external sources periodically:
+
+    ```typescript
+    // From triggers-and-pollers.ts:92-110
+    async runPoll(
+      workflow: Workflow,
+      node: INode,
+      pollFunctions: IPollFunctions
+    ): Promise<INodeExecutionData[][] | null> {
+      const nodeType = workflow.nodeTypes.getByNameAndVersion(
+        node.type,
+        node.typeVersion
+      );
+      
+      if (!nodeType.poll) {
+        throw new ApplicationError(
+          'Node type does not have a poll function defined'
+        );
+      }
+      
+      return await nodeType.poll.call(pollFunctions);
+    }
+    ```
+
+    **Examples:**
+    - RSS feed polling
+    - Email inbox polling
+    - API endpoint polling
+  </Step>
+</Steps>
+
+### Lifecycle Management
+
+```typescript
+// Active workflows are managed by ActiveWorkflows class
+class ActiveWorkflows {
+  // Add workflow to active list
+  async add(
+    workflowId: string,
+    workflow: Workflow,
+    mode: WorkflowExecuteMode = 'trigger'
+  ): Promise<void> {
+    // Start triggers and pollers
+    const triggerNodes = workflow.getTriggerNodes();
+    for (const node of triggerNodes) {
+      const triggerResponse = await runTrigger(workflow, node);
+      
+      // Store cleanup function
+      this.triggers[workflowId] = triggerResponse?.closeFunction;
+    }
+  }
+  
+  // Remove workflow from active list
+  async remove(workflowId: string): Promise<void> {
+    // Call cleanup functions
+    const closeFunction = this.triggers[workflowId];
+    if (closeFunction) {
+      await closeFunction();
+    }
+  }
+}
+```
+
+## Webhook Mode
+
+Webhook mode handles incoming HTTP requests to webhook endpoints.
+
+### Request Handling
+
+```typescript
+const mode: WorkflowExecuteMode = 'webhook';
+
+// Webhook functions have access to HTTP request
+interface IWebhookFunctions {
+  getRequestObject(): express.Request;
+  getResponseObject(): express.Response;
+  getBodyData(): IDataObject;
+  getHeaderData(): IDataObject;
+  getQueryData(): IDataObject;
+  getParamsData(): IDataObject;
+}
+```
+
+### Response Patterns
+
+<CodeGroup>
+```typescript Immediate Response
+// Webhook node returns response immediately
+async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+  const body = this.getBodyData();
+  
+  return {
+    // Response sent to caller
+    webhookResponse: {
+      status: 200,
+      body: { received: true }
+    },
+    // Data passed to workflow
+    workflowData: [
+      [{ json: body }]
+    ]
+  };
+}
+```
+
+```typescript Delayed Response
+// "Respond to Webhook" node sends response later
+const workflow = {
+  nodes: [
+    {
+      name: 'Webhook',
+      type: 'n8n-nodes-base.webhook',
+      parameters: {
+        responseMode: 'lastNode'
+      }
+    },
+    {
+      name: 'Process Data',
+      type: 'n8n-nodes-base.set'
+    },
+    {
+      name: 'Respond',
+      type: 'n8n-nodes-base.respondToWebhook',
+      parameters: {
+        responseBody: '={{$json}}'
+      }
+    }
+  ]
+};
+```
+
+```typescript No Response
+// Fire and forget - no response needed
+const webhook: INode = {
+  parameters: {
+    responseMode: 'onReceived',
+    responseCode: 202  // Accepted
+  }
+};
+```
+</CodeGroup>
+
+### Webhook Paths
+
+```typescript
+// Webhook URL format:
+// Production: https://your-n8n.com/webhook/{path}
+// Test: https://your-n8n.com/webhook-test/{path}
+
+const webhookNode: INode = {
+  name: 'Webhook',
+  type: 'n8n-nodes-base.webhook',
+  parameters: {
+    path: 'github-events',
+    httpMethod: 'POST',
+    authentication: 'headerAuth'
+  },
+  credentials: {
+    headerAuth: {
+      id: 'header-auth-id',
+      name: 'GitHub Webhook Auth'
+    }
+  }
+};
+```
+
+## Internal Mode
+
+Internal mode is used for system operations and subworkflows.
+
+### Subworkflow Execution
+
+```typescript
+// Execute Workflow node runs subworkflows in internal mode
+const executeWorkflow: INode = {
+  name: 'Execute Workflow',
+  type: 'n8n-nodes-base.executeWorkflow',
+  parameters: {
+    workflowId: 'subworkflow-id',
+    mode: 'integrated'  // Run in same process
+  }
+};
+
+// Subworkflow executes in 'internal' mode
+const subworkflowMode: WorkflowExecuteMode = 'internal';
+```
+
+### Execution Context Inheritance
+
+```typescript
+// From execution-context.ts:48-86
+interface IExecutionContext {
+  version: 1;
+  establishedAt: number;
+  source: WorkflowExecuteMode;
+  triggerNode?: {
+    name: string;
+    type: string;
+  };
+  // Parent execution ID for subworkflows
+  parentExecutionId?: string;
+  // Encrypted credential context
+  credentials?: string;
+}
+
+// Subworkflow inherits context from parent
+const subworkflowContext = establishExecutionContext({
+  source: 'internal',
+  parentExecutionId: parentExecution.id,
+  credentials: parentExecution.context.credentials
+});
+```
+
+## Error Mode
+
+Error mode runs error workflows when other workflows fail.
+
+### Error Workflow Execution
+
+```typescript
+const mode: WorkflowExecuteMode = 'error';
+
+// Error workflow receives error data
+const errorData: IExecutionError = {
+  execution: {
+    id: 'exec-123',
+    mode: 'trigger',
+    startedAt: new Date(),
+    workflowId: 'workflow-456',
+    workflowName: 'Data Sync'
+  },
+  workflow: {
+    id: 'workflow-456',
+    name: 'Data Sync'
+  },
+  node: {
+    name: 'HTTP Request',
+    type: 'n8n-nodes-base.httpRequest',
+    parameters: { url: 'https://api.example.com' }
+  },
+  error: {
+    message: 'Request failed with status code 404',
+    stack: '...',
+    context: { itemIndex: 0 }
+  }
+};
+```
+
+### Error Workflow Pattern
+
+<Steps>
+  <Step title="Configure Error Workflow">
+    ```typescript
+    const workflowSettings: IWorkflowSettings = {
+      errorWorkflow: 'error-handler-id'
+    };
+    ```
+  </Step>
+
+  <Step title="Add Error Trigger">
+    ```typescript
+    const errorTrigger: INode = {
+      name: 'Error Trigger',
+      type: 'n8n-nodes-base.errorTrigger',
+      typeVersion: 1,
+      position: [250, 300],
+      parameters: {}
+    };
+    ```
+  </Step>
+
+  <Step title="Process Error">
+    ```javascript
+    // Access error details in subsequent nodes
+    {{
+      subject: `Error in ${$json.workflow.name}`,
+      body: `
+        Node: ${$json.node.name}
+        Error: ${$json.error.message}
+        Time: ${$json.execution.startedAt}
+      `
+    }}
+    ```
+  </Step>
+</Steps>
+
+## Retry Mode
+
+Retry mode re-executes failed workflows or nodes.
+
+```typescript
+const mode: WorkflowExecuteMode = 'retry';
+
+// Retry maintains original execution context
+const retryExecution = {
+  mode: 'retry',
+  originalExecutionId: 'exec-123',
+  retryOf: 'exec-123',
+  // Retry uses same input data as original
+  workflowData: originalExecution.data
+};
+```
+
+## CLI Mode
+
+CLI mode executes workflows via command line.
+
+```bash
+# Execute workflow via CLI
+n8n execute --id workflow-id
+
+# Execute with custom data
+n8n execute --id workflow-id --data '{"key": "value"}'
+```
+
+```typescript
+const mode: WorkflowExecuteMode = 'cli';
+
+// CLI executions:
+// - Run synchronously
+// - Output to stdout/stderr
+// - Exit with status code
+// - No web UI interaction
+```
+
+## Execution Context
+
+Each execution has a context that persists throughout execution:
+
+```typescript
+// From execution-context.ts
+export const establishExecutionContext = (
+  source: WorkflowExecuteMode,
+  triggerNode?: { name: string; type: string },
+  parentExecutionId?: string
+): IExecutionContext => {
+  return {
+    version: 1,
+    establishedAt: Date.now(),
+    source,
+    triggerNode,
+    parentExecutionId
+  };
+};
+```
+
+## Mode-Specific Behavior
+
+| Feature | Manual | Trigger | Webhook | Internal | Error |
+|---------|--------|---------|---------|----------|-------|
+| Save Execution | Optional | Yes | Yes | Yes | Yes |
+| Live Updates | Yes | No | No | No | No |
+| Timeout | Yes | Yes | Yes | No | No |
+| Pin Data | Yes | No | No | No | No |
+| Wait Nodes | Yes | Yes | Yes | Yes | No |
+| Static Data | R/W | R/W | R/W | R/W | Read |
+| Credentials | All | Active | Active | All | All |
+
+## Best Practices
+
+1. **Test in manual mode**: Always test workflows before activation
+2. **Handle webhook timeouts**: Return quick responses, process async
+3. **Use appropriate triggers**: Match trigger type to use case
+4. **Configure error workflows**: Set up centralized error handling
+5. **Monitor active workflows**: Track webhook calls and schedule runs
+6. **Cleanup resources**: Ensure trigger nodes cleanup properly
+7. **Consider execution limits**: Be aware of timeout settings
+
+<Tip>
+**Mode Detection in Nodes:**
+
+```javascript
+// Access execution mode in expressions
+{{$execution.mode}}
+
+// Conditional logic based on mode
+{{
+  $execution.mode === 'manual' 
+    ? 'Test data' 
+    : 'Production data'
+}}
+```
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Workflows" icon="diagram-project" href="/workflows/creating-workflows">
+    Learn workflow structure and design
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/workflows/error-handling">
+    Master error handling patterns
+  </Card>
+</CardGroup>

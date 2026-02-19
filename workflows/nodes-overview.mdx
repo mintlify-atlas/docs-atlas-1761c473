@@ -1,0 +1,551 @@
+---
+title: Nodes Overview
+description: Understanding n8n nodes, their types, parameters, connections, and how to work with them programmatically
+---
+
+# Nodes Overview
+
+Nodes are the building blocks of n8n workflows. Each node represents a discrete action or operation, such as making an HTTP request, processing data, or triggering workflows. This guide covers node structure, types, and how to work with them.
+
+## Node Structure
+
+Every node in n8n follows the `INode` interface:
+
+```typescript
+interface INode {
+  name: string;                    // Unique identifier within workflow
+  type: string;                    // Node type (e.g., 'n8n-nodes-base.httpRequest')
+  typeVersion: number;             // Version of the node type
+  position: [number, number];      // Visual position [x, y]
+  parameters: INodeParameters;     // Node configuration
+  disabled?: boolean;              // If true, node is skipped
+  notes?: string;                  // Documentation notes
+  notesInFlow?: boolean;           // Show notes in canvas
+  retryOnFail?: boolean;           // Enable automatic retry
+  maxTries?: number;               // Maximum retry attempts
+  waitBetweenTries?: number;       // Delay between retries (ms)
+  alwaysOutputData?: boolean;      // Output data even on error
+  executeOnce?: boolean;           // Run once for all items
+  continueOnFail?: boolean;        // Continue workflow on error
+  credentials?: INodeCredentials;  // Attached credentials
+}
+```
+
+## Node Types
+
+n8n has several categories of nodes:
+
+<Tabs>
+  <Tab title="Trigger Nodes">
+    Trigger nodes start workflow executions automatically based on events:
+
+    ```typescript
+    interface INodeType {
+      trigger?: (this: ITriggerFunctions) => Promise<ITriggerResponse | undefined>;
+    }
+    ```
+
+    **Examples:**
+    - `n8n-nodes-base.webhook` - HTTP webhooks
+    - `n8n-nodes-base.scheduleTrigger` - Cron-based scheduling
+    - `n8n-nodes-base.formTrigger` - Form submissions
+    - `n8n-nodes-base.manualTrigger` - Manual execution
+
+    **Key Characteristics:**
+    - Return a cleanup function to stop the trigger
+    - Can emit data multiple times
+    - Have `trigger` property defined on node type
+  </Tab>
+
+  <Tab title="Poll Nodes">
+    Poll nodes check external sources at regular intervals:
+
+    ```typescript
+    interface INodeType {
+      poll?: (this: IPollFunctions) => Promise<INodeExecutionData[][] | null>;
+    }
+    ```
+
+    **Examples:**
+    - RSS Feed polling
+    - Email inbox polling
+    - API endpoint polling
+
+    **Key Characteristics:**
+    - Called on a schedule
+    - Return `null` if no new data
+    - Have `poll` property defined on node type
+  </Tab>
+
+  <Tab title="Regular Nodes">
+    Regular nodes process data as it flows through the workflow:
+
+    ```typescript
+    interface INodeType {
+      execute?: (this: IExecuteFunctions) => Promise<INodeExecutionData[][]>;
+    }
+    ```
+
+    **Examples:**
+    - HTTP Request node
+    - Set node (data transformation)
+    - IF node (conditional routing)
+    - Code node (custom JavaScript)
+
+    **Key Characteristics:**
+    - Process input data and return output
+    - Can have multiple inputs and outputs
+    - Execute synchronously in workflow order
+  </Tab>
+
+  <Tab title="Webhook Nodes">
+    Webhook nodes handle incoming HTTP requests:
+
+    ```typescript
+    interface INodeType {
+      webhook?: (this: IWebhookFunctions) => Promise<IWebhookResponseData>;
+    }
+    ```
+
+    **Examples:**
+    - `n8n-nodes-base.webhook` - Generic webhook
+    - `n8n-nodes-base.formTrigger` - Form webhooks
+
+    **Key Characteristics:**
+    - Respond to HTTP requests
+    - Can return immediate responses
+    - Have webhook paths and methods
+  </Tab>
+</Tabs>
+
+## Node Parameters
+
+Node parameters define how a node behaves. The `INodeProperties` interface describes available parameters:
+
+```typescript
+const nodeProperties: INodeProperties[] = [
+  {
+    displayName: 'URL',
+    name: 'url',
+    type: 'string',
+    required: true,
+    default: '',
+    placeholder: 'https://api.example.com',
+    description: 'The URL to make the request to'
+  },
+  {
+    displayName: 'Method',
+    name: 'method',
+    type: 'options',
+    options: [
+      { name: 'GET', value: 'GET' },
+      { name: 'POST', value: 'POST' },
+      { name: 'PUT', value: 'PUT' },
+      { name: 'DELETE', value: 'DELETE' }
+    ],
+    default: 'GET'
+  }
+];
+```
+
+### Parameter Types
+
+<CodeGroup>
+```typescript String Parameter
+{
+  displayName: 'API Key',
+  name: 'apiKey',
+  type: 'string',
+  typeOptions: {
+    password: true  // Mask in UI
+  },
+  default: ''
+}
+```
+
+```typescript Number Parameter
+{
+  displayName: 'Retry Count',
+  name: 'retries',
+  type: 'number',
+  typeOptions: {
+    minValue: 0,
+    maxValue: 10
+  },
+  default: 3
+}
+```
+
+```typescript Options Parameter
+{
+  displayName: 'Authentication',
+  name: 'authentication',
+  type: 'options',
+  options: [
+    { name: 'None', value: 'none' },
+    { name: 'Basic Auth', value: 'basic' },
+    { name: 'OAuth2', value: 'oauth2' }
+  ],
+  default: 'none'
+}
+```
+
+```typescript Collection Parameter
+{
+  displayName: 'Headers',
+  name: 'headers',
+  type: 'fixedCollection',
+  typeOptions: {
+    multipleValues: true
+  },
+  default: {},
+  options: [
+    {
+      name: 'header',
+      displayName: 'Header',
+      values: [
+        {
+          displayName: 'Name',
+          name: 'name',
+          type: 'string',
+          default: ''
+        },
+        {
+          displayName: 'Value',
+          name: 'value',
+          type: 'string',
+          default: ''
+        }
+      ]
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Getting Node Parameters
+
+The `NodeHelpers.getNodeParameters()` function merges defaults with user values:
+
+```typescript
+import { NodeHelpers } from 'n8n-workflow';
+
+// Get parameters with defaults applied
+const parameters = NodeHelpers.getNodeParameters(
+  nodeType.description.properties,  // Parameter definitions
+  node.parameters,                  // User-provided values
+  true,                            // Include defaults
+  false,                           // Don't throw on missing
+  node,                            // The node instance
+  nodeType.description             // Node type description
+);
+```
+
+## Node Connections
+
+Connections define data flow between nodes. Each connection specifies:
+
+```typescript
+interface IConnection {
+  node: string;              // Target node name
+  type: NodeConnectionType;  // Connection type ('main', 'ai_agent', etc.)
+  index: number;            // Output/input index
+}
+
+// Connection types
+const NodeConnectionTypes = {
+  Main: 'main',              // Standard data flow
+  AiAgent: 'ai_agent',       // AI agent connections
+  AiTool: 'ai_tool',         // AI tool connections
+  AiDocument: 'ai_document', // Document connections
+  AiMemory: 'ai_memory'      // Memory connections
+};
+```
+
+### Multiple Outputs
+
+Nodes can have multiple outputs for different routing scenarios:
+
+```typescript
+// IF node with true/false outputs
+const connections = {
+  'IF': {
+    'main': [
+      // Output 0 (true branch)
+      [{ node: 'ProcessTrue', type: 'main', index: 0 }],
+      // Output 1 (false branch)
+      [{ node: 'ProcessFalse', type: 'main', index: 0 }]
+    ]
+  }
+};
+```
+
+### Multiple Inputs
+
+Nodes can accept data from multiple sources:
+
+```typescript
+// Merge node combining two inputs
+const connections = {
+  'Source1': {
+    'main': [[{ node: 'Merge', type: 'main', index: 0 }]]
+  },
+  'Source2': {
+    'main': [[{ node: 'Merge', type: 'main', index: 1 }]]
+  }
+};
+```
+
+## Node Execution Data
+
+Data flows between nodes as `INodeExecutionData`:
+
+```typescript
+interface INodeExecutionData {
+  json: IDataObject;                    // JSON data
+  binary?: IBinaryKeyData;              // Binary files
+  pairedItem?: IPairedItemData;         // Link to source item
+  error?: Error;                        // Error information
+  metadata?: ITaskMetadata;             // Execution metadata
+}
+
+// Example execution data
+const executionData: INodeExecutionData[] = [
+  {
+    json: {
+      id: 1,
+      name: 'John Doe',
+      email: 'john@example.com'
+    },
+    binary: {
+      data: {
+        data: 'base64string...',
+        mimeType: 'image/png',
+        fileName: 'profile.png'
+      }
+    },
+    pairedItem: {
+      item: 0,  // Source item index
+      input: 0  // Source input index
+    }
+  }
+];
+```
+
+<Note>
+The `pairedItem` property tracks data lineage, allowing you to trace which output items came from which input items.
+</Note>
+
+## Node Outputs
+
+Nodes return data in a specific format:
+
+```typescript
+// Single output
+return [executionData];
+
+// Multiple outputs (e.g., IF node)
+return [
+  trueItems,   // Output 0
+  falseItems   // Output 1
+];
+
+// No data
+return [[]];
+```
+
+### Node Output Configuration
+
+Node types can define dynamic outputs:
+
+```typescript
+const nodeType: INodeType = {
+  description: {
+    outputs: [
+      'main',  // First output
+      'main'   // Second output
+    ],
+    // Or dynamic outputs
+    outputs: '={{$parameter["outputs"]}}',
+    // Or output names
+    outputNames: ['Success', 'Error']
+  }
+};
+```
+
+## Common Node Patterns
+
+### Cron/Schedule Node
+
+The Schedule Trigger uses cron expressions:
+
+```typescript
+// From node-helpers.ts - Cron node configuration
+const cronNodeOptions: INodePropertyCollection[] = [
+  {
+    name: 'item',
+    displayName: 'Item',
+    values: [
+      {
+        displayName: 'Mode',
+        name: 'mode',
+        type: 'options',
+        options: [
+          { name: 'Every Minute', value: 'everyMinute' },
+          { name: 'Every Hour', value: 'everyHour' },
+          { name: 'Every Day', value: 'everyDay' },
+          { name: 'Every Week', value: 'everyWeek' },
+          { name: 'Every Month', value: 'everyMonth' },
+          { name: 'Custom', value: 'custom' }
+        ],
+        default: 'everyDay'
+      },
+      {
+        displayName: 'Hour',
+        name: 'hour',
+        type: 'number',
+        typeOptions: { minValue: 0, maxValue: 23 },
+        default: 14
+      },
+      {
+        displayName: 'Cron Expression',
+        name: 'cronExpression',
+        type: 'string',
+        displayOptions: { show: { mode: ['custom'] } },
+        default: '* * * * * *',
+        description: 'Custom cron expression'
+      }
+    ]
+  }
+];
+```
+
+### Error Handling in Nodes
+
+Nodes can handle errors at the node level:
+
+```typescript
+const node: INode = {
+  name: 'HTTP Request',
+  type: 'n8n-nodes-base.httpRequest',
+  typeVersion: 1,
+  position: [450, 300],
+  parameters: {},
+  // Error handling options
+  retryOnFail: true,          // Enable retry on failure
+  maxTries: 3,                // Maximum 3 attempts
+  waitBetweenTries: 1000,     // Wait 1 second between tries
+  continueOnFail: false,      // Stop workflow on failure
+  alwaysOutputData: false     // Don't output data on error
+};
+```
+
+## Node Type Methods
+
+Node types can implement various lifecycle methods:
+
+<Steps>
+  <Step title="execute">
+    Main execution method for processing data:
+
+    ```typescript
+    async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+      const items = this.getInputData();
+      const returnData: INodeExecutionData[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        // Process each item
+        const result = await processItem(items[i]);
+        returnData.push({ json: result });
+      }
+
+      return [returnData];
+    }
+    ```
+  </Step>
+
+  <Step title="webhook">
+    Handle incoming webhook requests:
+
+    ```typescript
+    async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+      const req = this.getRequestObject();
+      const body = this.getBodyData();
+
+      return {
+        workflowData: [
+          [{ json: body }]
+        ]
+      };
+    }
+    ```
+  </Step>
+
+  <Step title="trigger">
+    Set up event-based triggers:
+
+    ```typescript
+    async trigger(this: ITriggerFunctions): Promise<ITriggerResponse> {
+      const emit = this.emit;
+
+      // Set up event listener
+      const listener = (data: any) => {
+        emit([[{ json: data }]]);
+      };
+
+      // Return cleanup function
+      return {
+        closeFunction: async () => {
+          // Remove listener
+        }
+      };
+    }
+    ```
+  </Step>
+
+  <Step title="poll">
+    Poll external sources:
+
+    ```typescript
+    async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+      const lastPoll = this.getWorkflowStaticData('node').lastPoll;
+      const data = await fetchNewData(lastPoll);
+
+      if (data.length === 0) {
+        return null;  // No new data
+      }
+
+      return [data.map(item => ({ json: item }))];
+    }
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+1. **Use descriptive node names**: Names should clearly indicate the node's purpose
+2. **Validate parameters**: Always validate user input in node implementations
+3. **Handle errors gracefully**: Use try-catch and return meaningful error messages
+4. **Respect disabled nodes**: Check `node.disabled` before processing
+5. **Use paired items**: Maintain data lineage with `pairedItem` for debugging
+6. **Document parameters**: Provide clear descriptions for all parameters
+7. **Test with different data types**: Ensure nodes handle various input scenarios
+
+<Tip>
+When developing nodes, use the `node-dev` CLI tool:
+
+```bash
+pnpm --filter n8n-node-dev exec n8n-node-dev
+```
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Expressions" icon="brackets-curly" href="/workflows/expressions">
+    Use expressions to work with dynamic data
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/workflows/error-handling">
+    Implement error handling and retry logic
+  </Card>
+</CardGroup>

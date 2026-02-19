@@ -1,0 +1,775 @@
+---
+title: "Executions API"
+description: "Monitor, control, and manage workflow execution history using the n8n REST API"
+---
+
+## Overview
+
+The Executions API provides endpoints to monitor workflow executions, view their results, retry failed executions, and stop running workflows. Every time a workflow runs, an execution record is created with detailed information about the run.
+
+## List Executions
+
+Retrieve a paginated list of workflow executions.
+
+```http
+GET /api/v1/executions
+```
+
+### Query Parameters
+
+<ParamField query="cursor" type="string">
+  Pagination cursor from previous response's `nextCursor`
+</ParamField>
+
+<ParamField query="limit" type="number" default="100">
+  Number of executions to return (max: 250)
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by execution status: `success`, `error`, `running`, `waiting`, `canceled`
+</ParamField>
+
+<ParamField query="includeData" type="boolean" default="false">
+  Include full execution data in response (significantly increases response size)
+</ParamField>
+
+<ParamField query="workflowId" type="string">
+  Filter executions by workflow ID
+</ParamField>
+
+<ParamField query="projectId" type="string">
+  Filter executions by project ID
+</ParamField>
+
+<ParamField query="lastId" type="string">
+  Return executions after this execution ID
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -H "X-N8N-API-KEY: your-api-key" \
+  "https://your-n8n-instance.com/api/v1/executions?status=error&limit=20"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions?status=error&limit=20',
+  {
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const { data, nextCursor } = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://your-n8n-instance.com/api/v1/executions',
+    headers={'X-N8N-API-KEY': 'your-api-key'},
+    params={'status': 'error', 'limit': 20}
+)
+
+executions = response.json()
+```
+</CodeGroup>
+
+### Response
+
+<ResponseField name="data" type="array">
+  Array of execution summary objects
+  
+  <ResponseField name="id" type="string">
+    Unique execution identifier
+  </ResponseField>
+  
+  <ResponseField name="workflowId" type="string">
+    ID of the workflow that was executed
+  </ResponseField>
+  
+  <ResponseField name="workflowName" type="string">
+    Name of the executed workflow
+  </ResponseField>
+  
+  <ResponseField name="status" type="string">
+    Execution status: `success`, `error`, `running`, `waiting`, `canceled`, `crashed`
+  </ResponseField>
+  
+  <ResponseField name="mode" type="string">
+    Execution mode: `manual`, `trigger`, `webhook`, `retry`
+  </ResponseField>
+  
+  <ResponseField name="startedAt" type="string">
+    ISO 8601 timestamp when execution started
+  </ResponseField>
+  
+  <ResponseField name="stoppedAt" type="string | null">
+    ISO 8601 timestamp when execution finished, or null if still running
+  </ResponseField>
+  
+  <ResponseField name="retryOf" type="string | null">
+    Execution ID this is a retry of, or null
+  </ResponseField>
+  
+  <ResponseField name="retrySuccessId" type="string | null">
+    ID of successful retry, or null
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="nextCursor" type="string | null">
+  Cursor for next page, or null if no more results
+</ResponseField>
+
+<ResponseField name="concurrentExecutionsCount" type="number">
+  Number of currently running executions
+</ResponseField>
+
+```json Example Response
+{
+  "data": [
+    {
+      "id": "exec_123",
+      "workflowId": "workflow_abc",
+      "workflowName": "Customer Onboarding",
+      "status": "error",
+      "mode": "trigger",
+      "startedAt": "2024-02-19T10:30:00.000Z",
+      "stoppedAt": "2024-02-19T10:30:15.234Z",
+      "retryOf": null,
+      "retrySuccessId": null
+    }
+  ],
+  "count": 1,
+  "estimated": false,
+  "concurrentExecutionsCount": 3,
+  "nextCursor": "eyJsYXN0SWQiOiJleGVjXzEyMyIsImxpbWl0IjoyMH0"
+}
+```
+
+## Get Execution
+
+Retrieve detailed information about a specific execution.
+
+```http
+GET /api/v1/executions/:id
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The execution ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="includeData" type="boolean" default="false">
+  Include full execution data and node outputs
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -H "X-N8N-API-KEY: your-api-key" \
+  "https://your-n8n-instance.com/api/v1/executions/exec_123?includeData=true"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions/exec_123?includeData=true',
+  {
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const execution = await response.json();
+console.log('Execution status:', execution.status);
+console.log('Node outputs:', execution.data?.resultData);
+```
+</CodeGroup>
+
+### Response
+
+<ResponseField name="id" type="string">
+  Execution ID
+</ResponseField>
+
+<ResponseField name="workflowId" type="string">
+  Workflow ID
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Execution status
+</ResponseField>
+
+<ResponseField name="mode" type="string">
+  Execution mode
+</ResponseField>
+
+<ResponseField name="startedAt" type="string">
+  Start timestamp
+</ResponseField>
+
+<ResponseField name="stoppedAt" type="string | null">
+  Stop timestamp
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Execution data (only when `includeData=true`)
+  
+  <ResponseField name="resultData" type="object">
+    Node execution results and outputs
+  </ResponseField>
+  
+  <ResponseField name="executionData" type="object">
+    Metadata about the execution
+  </ResponseField>
+</ResponseField>
+
+```json Example Response
+{
+  "id": "exec_123",
+  "workflowId": "workflow_abc",
+  "status": "success",
+  "mode": "manual",
+  "startedAt": "2024-02-19T10:30:00.000Z",
+  "stoppedAt": "2024-02-19T10:30:05.123Z",
+  "data": {
+    "resultData": {
+      "runData": {
+        "Webhook": [
+          {
+            "startTime": 1708338600000,
+            "executionTime": 12,
+            "data": {
+              "main": [
+                [
+                  {
+                    "json": {
+                      "email": "customer@example.com",
+                      "name": "John Doe"
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+<Note>
+Setting `includeData=true` returns the full execution data including all node inputs and outputs. This can be a very large response for complex workflows.
+</Note>
+
+## Stop Execution
+
+Stop a currently running execution.
+
+```http
+POST /api/v1/executions/:id/stop
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The execution ID to stop
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  https://your-n8n-instance.com/api/v1/executions/exec_123/stop
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions/exec_123/stop',
+  {
+    method: 'POST',
+    headers: { 'X-N8N-API-KEY': 'your-api-key' }
+  }
+);
+
+const result = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns the stopped execution object with `status: "canceled"`.
+
+```json
+{
+  "id": "exec_123",
+  "status": "canceled",
+  "stoppedAt": "2024-02-19T10:31:00.000Z"
+}
+```
+
+## Stop Many Executions
+
+Stop multiple running executions based on filters.
+
+```http
+POST /api/v1/executions/stopMany
+```
+
+### Request Body
+
+<ParamField body="filter" type="object" required>
+  Filter criteria for executions to stop
+  
+  <ParamField body="filter.workflowId" type="string">
+    Filter by workflow ID, or "all" for all workflows
+  </ParamField>
+  
+  <ParamField body="filter.status" type="string[]" required>
+    Array of statuses to stop: `["running", "waiting", "queued"]`
+  </ParamField>
+  
+  <ParamField body="filter.startedAfter" type="string">
+    ISO 8601 timestamp - only stop executions started after this time
+  </ParamField>
+  
+  <ParamField body="filter.startedBefore" type="string">
+    ISO 8601 timestamp - only stop executions started before this time
+  </ParamField>
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "workflowId": "workflow_abc",
+      "status": ["running", "waiting"]
+    }
+  }' \
+  https://your-n8n-instance.com/api/v1/executions/stopMany
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions/stopMany',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      filter: {
+        workflowId: 'workflow_abc',
+        status: ['running', 'waiting']
+      }
+    })
+  }
+);
+
+const result = await response.json();
+console.log(`Stopped ${result.stopped} executions`);
+```
+</CodeGroup>
+
+### Response
+
+```json
+{
+  "stopped": 5
+}
+```
+
+<Warning>
+This operation stops all matching executions. Use filters carefully to avoid stopping unintended executions.
+</Warning>
+
+## Retry Execution
+
+Retry a failed or canceled execution.
+
+```http
+POST /api/v1/executions/:id/retry
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The execution ID to retry
+</ParamField>
+
+### Request Body
+
+<ParamField body="loadWorkflow" type="boolean" default="false">
+  Whether to load the latest workflow version (true) or use the original version (false)
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"loadWorkflow": false}' \
+  https://your-n8n-instance.com/api/v1/executions/exec_123/retry
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions/exec_123/retry',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ loadWorkflow: false })
+  }
+);
+
+const retriedExecution = await response.json();
+console.log('New execution ID:', retriedExecution.id);
+```
+</CodeGroup>
+
+### Response
+
+Returns a new execution object with the retry information:
+
+```json
+{
+  "id": "exec_456",
+  "workflowId": "workflow_abc",
+  "status": "running",
+  "mode": "retry",
+  "retryOf": "exec_123",
+  "startedAt": "2024-02-19T10:35:00.000Z"
+}
+```
+
+<Note>
+- Only failed, canceled, or crashed executions can be retried
+- The retry creates a new execution linked to the original via `retryOf`
+- Setting `loadWorkflow: true` uses the current workflow version, which may differ from the original execution
+</Note>
+
+## Delete Execution
+
+Permanently delete an execution and its data.
+
+```http
+POST /api/v1/executions/delete
+```
+
+### Request Body
+
+<ParamField body="ids" type="string[]" required>
+  Array of execution IDs to delete
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ids": ["exec_123", "exec_456", "exec_789"]
+  }' \
+  https://your-n8n-instance.com/api/v1/executions/delete
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions/delete',
+  {
+    method: 'POST',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ids: ['exec_123', 'exec_456', 'exec_789']
+    })
+  }
+);
+
+const result = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+<Warning>
+Deleting executions permanently removes all execution data including logs and outputs. This cannot be undone.
+</Warning>
+
+## Update Execution
+
+Update execution metadata such as annotations.
+
+```http
+PATCH /api/v1/executions/:id
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The execution ID to update
+</ParamField>
+
+### Request Body
+
+<ParamField body="annotation" type="object">
+  Annotation data to attach to the execution
+  
+  <ParamField body="annotation.tags" type="string[]">
+    Array of tag IDs to assign
+  </ParamField>
+  
+  <ParamField body="annotation.vote" type="string">
+    User vote: "up" or "down"
+  </ParamField>
+</ParamField>
+
+### Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X PATCH \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "annotation": {
+      "tags": ["tag_production", "tag_urgent"],
+      "vote": "up"
+    }
+  }' \
+  https://your-n8n-instance.com/api/v1/executions/exec_123
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions/exec_123',
+  {
+    method: 'PATCH',
+    headers: {
+      'X-N8N-API-KEY': 'your-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      annotation: {
+        tags: ['tag_production', 'tag_urgent'],
+        vote: 'up'
+      }
+    })
+  }
+);
+
+const updated = await response.json();
+```
+</CodeGroup>
+
+### Response
+
+Returns the updated execution object.
+
+## Execution Status Values
+
+Executions can have the following status values:
+
+<ResponseField name="success" type="status">
+  Execution completed successfully without errors
+</ResponseField>
+
+<ResponseField name="error" type="status">
+  Execution failed with an error in one or more nodes
+</ResponseField>
+
+<ResponseField name="running" type="status">
+  Execution is currently in progress
+</ResponseField>
+
+<ResponseField name="waiting" type="status">
+  Execution is waiting for an external event or condition
+</ResponseField>
+
+<ResponseField name="canceled" type="status">
+  Execution was manually stopped by a user
+</ResponseField>
+
+<ResponseField name="crashed" type="status">
+  Execution crashed unexpectedly (system error)
+</ResponseField>
+
+<ResponseField name="new" type="status">
+  Execution is queued and waiting to start
+</ResponseField>
+
+## Common Patterns
+
+### Monitor Workflow Execution
+
+<CodeGroup>
+```javascript Poll Execution Status
+async function waitForExecution(executionId) {
+  const maxAttempts = 60;
+  const pollInterval = 2000; // 2 seconds
+  
+  for (let i = 0; i < maxAttempts; i++) {
+    const response = await fetch(
+      `https://your-n8n-instance.com/api/v1/executions/${executionId}`,
+      { headers: { 'X-N8N-API-KEY': 'your-api-key' } }
+    );
+    
+    const execution = await response.json();
+    
+    if (['success', 'error', 'canceled', 'crashed'].includes(execution.status)) {
+      return execution;
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+  
+  throw new Error('Execution timeout');
+}
+
+const result = await waitForExecution('exec_123');
+console.log('Execution finished with status:', result.status);
+```
+</CodeGroup>
+
+### Clean Up Old Executions
+
+<CodeGroup>
+```javascript Delete Old Executions
+const thirtyDaysAgo = new Date();
+thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+// Fetch old executions
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions?limit=100',
+  { headers: { 'X-N8N-API-KEY': 'your-api-key' } }
+);
+
+const { data } = await response.json();
+
+// Filter executions older than 30 days
+const oldExecutionIds = data
+  .filter(exec => new Date(exec.startedAt) < thirtyDaysAgo)
+  .map(exec => exec.id);
+
+if (oldExecutionIds.length > 0) {
+  // Delete in batches
+  await fetch(
+    'https://your-n8n-instance.com/api/v1/executions/delete',
+    {
+      method: 'POST',
+      headers: {
+        'X-N8N-API-KEY': 'your-api-key',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ids: oldExecutionIds })
+    }
+  );
+  
+  console.log(`Deleted ${oldExecutionIds.length} old executions`);
+}
+```
+</CodeGroup>
+
+### Retry All Failed Executions
+
+<CodeGroup>
+```javascript Batch Retry
+const response = await fetch(
+  'https://your-n8n-instance.com/api/v1/executions?status=error&limit=50',
+  { headers: { 'X-N8N-API-KEY': 'your-api-key' } }
+);
+
+const { data } = await response.json();
+
+for (const execution of data) {
+  try {
+    await fetch(
+      `https://your-n8n-instance.com/api/v1/executions/${execution.id}/retry`,
+      {
+        method: 'POST',
+        headers: {
+          'X-N8N-API-KEY': 'your-api-key',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ loadWorkflow: true })
+      }
+    );
+    console.log(`Retried execution ${execution.id}`);
+  } catch (error) {
+    console.error(`Failed to retry ${execution.id}:`, error);
+  }
+}
+```
+</CodeGroup>
+
+## Error Responses
+
+### 404 Not Found
+
+```json
+{
+  "message": "Execution not found"
+}
+```
+
+### 409 Conflict
+
+```json
+{
+  "message": "Cannot retry a running or waiting execution"
+}
+```
+
+### 400 Bad Request
+
+```json
+{
+  "message": "Cannot delete a running execution"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflows API" icon="diagram-project" href="/api/workflows">
+    Manage workflows programmatically
+  </Card>
+  <Card title="Credentials API" icon="lock" href="/api/credentials">
+    Manage workflow credentials
+  </Card>
+  <Card title="Execution Data" icon="database" href="/workflows/executions">
+    Learn about execution data structure
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/workflows/error-handling">
+    Handle execution errors
+  </Card>
+</CardGroup>

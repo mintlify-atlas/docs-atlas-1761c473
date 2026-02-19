@@ -1,0 +1,628 @@
+---
+title: Embeddings
+description: Convert text into vector representations for semantic search and AI applications in n8n
+---
+
+# Embeddings
+
+Embeddings are numerical representations of text that capture semantic meaning. They enable semantic search, similarity comparison, and are essential for vector databases and RAG applications.
+
+## What are Embeddings?
+
+Embeddings convert text into high-dimensional vectors (arrays of numbers) where:
+
+- **Similar meanings** → Similar vectors
+- **Different meanings** → Distant vectors
+- **Semantic relationships** are preserved
+
+<Note>
+  For example, "king" and "queen" will have similar embeddings because they're semantically related, even though they share no letters.
+</Note>
+
+## Why Use Embeddings?
+
+<CardGroup cols={2}>
+  <Card title="Semantic Search" icon="search">
+    Find content by meaning, not just keywords
+  </Card>
+  <Card title="Similarity Comparison" icon="scale">
+    Compare documents for similarity
+  </Card>
+  <Card title="RAG Applications" icon="robot">
+    Provide relevant context to LLMs
+  </Card>
+  <Card title="Classification" icon="tags">
+    Categorize content by semantic similarity
+  </Card>
+</CardGroup>
+
+## Available Embedding Models
+
+n8n supports embeddings from multiple providers:
+
+### OpenAI Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsOpenAi`
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/embeddings/EmbeddingsOpenAI/EmbeddingsOpenAi.node.ts:78`
+
+**Models**:
+- `text-embedding-3-small` (1536 dimensions) - Default, best value
+- `text-embedding-3-large` (3072 dimensions) - Highest quality
+- `text-embedding-ada-002` (1536 dimensions) - Legacy model
+
+**Configuration**:
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+  "parameters": {
+    "model": "text-embedding-3-small",
+    "options": {
+      "dimensions": 1536,
+      "batchSize": 512,
+      "stripNewLines": true
+    }
+  }
+}
+```
+
+**Options**:
+
+From the source code:
+
+```typescript
+options: {
+  dimensions: 256 | 512 | 1024 | 1536 | 3072,
+  batchSize: number,        // Max 2048
+  stripNewLines: boolean,
+  timeout: number,
+  encodingFormat: 'float' | 'base64'
+}
+```
+
+<Tip>
+  **text-embedding-3-small** offers the best balance of quality, speed, and cost for most use cases.
+</Tip>
+
+### Cohere Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsCohere`
+
+**Source Reference**: `/home/daytona/workspace/source/packages/@n8n/nodes-langchain/nodes/embeddings/EmbeddingsCohere/EmbeddingsCohere.node.ts:13`
+
+**Models**:
+- `embed-english-v3.0` (1024 dimensions)
+- `embed-english-v2.0` (4096 dimensions)
+- `embed-english-light-v3.0` (384 dimensions)
+- `embed-english-light-v2.0` (1024 dimensions)
+- `embed-multilingual-v3.0` (1024 dimensions)
+- `embed-multilingual-v2.0` (768 dimensions)
+- `embed-multilingual-light-v3.0` (384 dimensions)
+
+**Configuration**:
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+  "parameters": {
+    "modelName": "embed-english-v3.0"
+  }
+}
+```
+
+<Note>
+  Each Cohere model uses different dimensional density. Make sure your vector store matches the model's dimensions.
+</Note>
+
+### Google Embeddings
+
+#### Google Gemini Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsGoogleGemini`
+
+**Models**:
+- `text-embedding-004`
+- `embedding-001`
+
+#### Google Vertex AI Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsGoogleVertex`
+
+**Use when**: You need Google Cloud integration
+
+### Azure OpenAI Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsAzureOpenAi`
+
+**Use when**: You're using Azure OpenAI Service
+
+**Configuration**:
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.embeddingsAzureOpenAi",
+  "parameters": {
+    "deploymentName": "text-embedding-ada-002"
+  }
+}
+```
+
+### AWS Bedrock Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsAwsBedrock`
+
+**Models**:
+- Amazon Titan Embeddings
+- Cohere Embed models via Bedrock
+
+### Ollama Embeddings (Local)
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsOllama`
+
+**Use when**: You need local/private embeddings
+
+**Models**:
+- `nomic-embed-text`
+- `all-minilm`
+- `mxbai-embed-large`
+- Any Ollama-compatible model
+
+**Configuration**:
+
+```typescript
+{
+  "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+  "parameters": {
+    "model": "nomic-embed-text",
+    "baseUrl": "http://localhost:11434"
+  }
+}
+```
+
+<Tip>
+  Ollama is perfect for development or when you need to keep data private. No API costs!
+</Tip>
+
+### Hugging Face Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference`
+
+**Use when**: You want open-source models via API
+
+**Popular Models**:
+- `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions)
+- `sentence-transformers/all-mpnet-base-v2` (768 dimensions)
+- `BAAI/bge-base-en-v1.5` (768 dimensions)
+
+### Mistral Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsMistralCloud`
+
+**Model**: `mistral-embed`
+
+### Lemonade AI Embeddings
+
+**Node**: `@n8n/n8n-nodes-langchain.embeddingsLemonade`
+
+**Use when**: Using Lemonade AI platform
+
+## Choosing an Embedding Model
+
+### Decision Matrix
+
+| Use Case | Recommended Model | Dimensions | Notes |
+|----------|------------------|------------|-------|
+| **General Purpose** | OpenAI text-embedding-3-small | 1536 | Best value |
+| **High Quality** | OpenAI text-embedding-3-large | 3072 | More expensive |
+| **Multilingual** | Cohere embed-multilingual-v3.0 | 1024 | Great for non-English |
+| **Budget-Conscious** | Cohere embed-english-light-v3.0 | 384 | Lower cost |
+| **Local/Private** | Ollama nomic-embed-text | 768 | No API costs |
+| **Azure Integration** | Azure OpenAI | 1536 | Native Azure |
+| **AWS Integration** | Bedrock Titan | 1536 | Native AWS |
+
+### Considerations
+
+<Steps>
+  <Step title="Quality Requirements">
+    Higher dimensions generally mean better quality but higher costs
+  </Step>
+  
+  <Step title="Language Support">
+    Use multilingual models if you need non-English support
+  </Step>
+  
+  <Step title="Cost">
+    Consider API costs, especially at scale
+  </Step>
+  
+  <Step title="Latency">
+    Smaller models are faster to compute
+  </Step>
+  
+  <Step title="Privacy">
+    Use local models (Ollama) if data privacy is critical
+  </Step>
+</Steps>
+
+## Using Embeddings in Workflows
+
+### Basic RAG Pipeline
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      {
+        "name": "Load Documents",
+        "type": "documentDefaultDataLoader"
+      },
+      {
+        "name": "Split Text",
+        "type": "textSplitterRecursiveCharacterTextSplitter",
+        "parameters": {
+          "chunkSize": 1000,
+          "chunkOverlap": 200
+        }
+      },
+      {
+        "name": "Generate Embeddings",
+        "type": "embeddingsOpenAi",
+        "parameters": {
+          "model": "text-embedding-3-small"
+        }
+      },
+      {
+        "name": "Store Vectors",
+        "type": "vectorStorePinecone",
+        "parameters": {
+          "mode": "insert"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Semantic Search
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      {
+        "name": "Embeddings",
+        "type": "embeddingsOpenAi"
+      },
+      {
+        "name": "Vector Store",
+        "type": "vectorStorePinecone",
+        "parameters": {
+          "mode": "retrieve"
+        }
+      },
+      {
+        "name": "Retriever",
+        "type": "retrieverVectorStore",
+        "parameters": {
+          "topK": 5
+        }
+      }
+    ]
+  }
+}
+```
+
+### Agent with Knowledge Base
+
+```json
+{
+  "workflow": {
+    "nodes": [
+      {
+        "name": "Chat Trigger",
+        "type": "chatTrigger"
+      },
+      {
+        "name": "Embeddings",
+        "type": "embeddingsOpenAi"
+      },
+      {
+        "name": "Knowledge Base",
+        "type": "vectorStorePinecone"
+      },
+      {
+        "name": "Vector Store Tool",
+        "type": "toolVectorStore",
+        "parameters": {
+          "name": "knowledge_base",
+          "description": "Search the company knowledge base"
+        }
+      },
+      {
+        "name": "Agent",
+        "type": "agent"
+      }
+    ]
+  }
+}
+```
+
+## Embedding Configuration
+
+### Batch Size
+
+From the OpenAI embeddings source code:
+
+```typescript
+{
+  displayName: 'Batch Size',
+  name: 'batchSize',
+  default: 512,
+  typeOptions: { maxValue: 2048 },
+  description: 'Maximum number of documents to send in each request'
+}
+```
+
+<Tip>
+  Larger batch sizes improve throughput but may hit rate limits. Start with 512 and adjust based on your usage.
+</Tip>
+
+### Dimensions (OpenAI only)
+
+OpenAI's text-embedding-3 models support configurable dimensions:
+
+```typescript
+{
+  displayName: 'Dimensions',
+  name: 'dimensions',
+  default: 1536,
+  options: [256, 512, 1024, 1536, 3072],
+  description: 'The number of dimensions the resulting output embeddings should have.'
+}
+```
+
+Lower dimensions:
+- ✅ Faster processing
+- ✅ Lower storage costs
+- ✅ Faster similarity search
+- ❌ Lower quality
+
+Higher dimensions:
+- ✅ Better quality
+- ✅ More accurate results
+- ❌ Slower
+- ❌ Higher costs
+
+### Strip New Lines
+
+```typescript
+{
+  displayName: 'Strip New Lines',
+  name: 'stripNewLines',
+  default: true,
+  description: 'Whether to strip new lines from the input text'
+}
+```
+
+<Note>
+  Stripping new lines can improve embedding quality by normalizing text format.
+</Note>
+
+## Best Practices
+
+### Always Use the Same Model
+
+<Tip>
+  **Critical**: Always use the same embedding model for both inserting and querying. Mixing models will produce incorrect results.
+</Tip>
+
+```typescript
+// ✅ Correct
+Insert: embeddingsOpenAi (text-embedding-3-small)
+Query:  embeddingsOpenAi (text-embedding-3-small)
+
+// ❌ Wrong
+Insert: embeddingsOpenAi (text-embedding-3-small)
+Query:  embeddingsCohere (embed-english-v3.0)
+```
+
+### Match Vector Store Dimensions
+
+Ensure your vector store is configured with the correct dimensions:
+
+```typescript
+// OpenAI text-embedding-3-small
+Embedding dimensions: 1536
+Vector store dimensions: 1536 ✅
+
+// Cohere embed-english-v3.0
+Embedding dimensions: 1024
+Vector store dimensions: 1024 ✅
+```
+
+### Optimize Chunk Size
+
+Chunk your text before embedding:
+
+```typescript
+{
+  "type": "textSplitterRecursiveCharacterTextSplitter",
+  "parameters": {
+    "chunkSize": 1000,      // Characters per chunk
+    "chunkOverlap": 200     // Overlap between chunks
+  }
+}
+```
+
+**Guidelines**:
+- **Too small** (< 200 chars): Lacks context
+- **Too large** (> 2000 chars): Dilutes specific information
+- **Optimal**: 500-1000 characters
+- **Overlap**: 10-20% of chunk size
+
+### Handle Rate Limits
+
+```typescript
+{
+  "options": {
+    "batchSize": 512,       // Reduce if hitting rate limits
+    "timeout": 60000        // Increase timeout for large batches
+  }
+}
+```
+
+### Monitor Costs
+
+**OpenAI Pricing** (as of 2024):
+- text-embedding-3-small: $0.02 / 1M tokens
+- text-embedding-3-large: $0.13 / 1M tokens
+- text-embedding-ada-002: $0.10 / 1M tokens
+
+**Cost Optimization**:
+- Use smaller models when appropriate
+- Cache embeddings when possible
+- Use lower dimensions for text-embedding-3
+- Consider Ollama for development
+
+### Cache Embeddings
+
+Avoid re-embedding the same content:
+
+```typescript
+// Store document hash with embedding
+{
+  "metadata": {
+    "contentHash": "abc123...",
+    "embeddingModel": "text-embedding-3-small"
+  }
+}
+```
+
+## Advanced Features
+
+### Custom Base URL
+
+For OpenAI-compatible APIs:
+
+```typescript
+{
+  "options": {
+    "baseURL": "https://api.custom-provider.com/v1"
+  }
+}
+```
+
+### Custom Headers
+
+Add custom HTTP headers:
+
+```typescript
+{
+  "options": {
+    "customHeaders": {
+      "X-Custom-Header": "value"
+    }
+  }
+}
+```
+
+### Timeout Configuration
+
+```typescript
+{
+  "options": {
+    "timeout": 60000  // 60 seconds
+  }
+}
+```
+
+## Troubleshooting
+
+### Dimension Mismatch Error
+
+**Error**: "Expected vector of size X, got Y"
+
+**Solution**: Ensure vector store dimensions match embedding model:
+
+```typescript
+// Check your embedding model dimensions
+const modelDimensions = {
+  'text-embedding-3-small': 1536,
+  'text-embedding-3-large': 3072,
+  'embed-english-v3.0': 1024,
+  'embed-multilingual-v2.0': 768
+};
+
+// Configure vector store accordingly
+```
+
+### Rate Limit Errors
+
+**Error**: "Rate limit exceeded"
+
+**Solutions**:
+1. Reduce batch size
+2. Add delays between batches
+3. Implement exponential backoff
+4. Upgrade API tier
+
+```typescript
+{
+  "options": {
+    "batchSize": 256  // Reduce from 512
+  }
+}
+```
+
+### Poor Search Quality
+
+**Possible Causes**:
+1. Wrong embedding model for query
+2. Poor chunk size
+3. Missing context
+4. Low-quality source data
+
+**Solutions**:
+1. Verify same model for insert and query
+2. Adjust chunk size and overlap
+3. Include surrounding context in chunks
+4. Clean and preprocess source data
+
+### High Latency
+
+**Solutions**:
+1. Use faster models (smaller dimensions)
+2. Increase batch size
+3. Consider local models (Ollama)
+4. Use edge locations
+5. Implement caching
+
+## Comparison Table
+
+| Provider | Model | Dimensions | Cost (per 1M tokens) | Best For |
+|----------|-------|------------|---------------------|----------|
+| OpenAI | text-embedding-3-small | 1536 | $0.02 | General purpose |
+| OpenAI | text-embedding-3-large | 3072 | $0.13 | High quality |
+| Cohere | embed-english-v3.0 | 1024 | $0.10 | English text |
+| Cohere | embed-multilingual-v3.0 | 1024 | $0.10 | Multilingual |
+| Cohere | embed-english-light-v3.0 | 384 | $0.10 | Budget |
+| Ollama | nomic-embed-text | 768 | Free | Local/Private |
+| Hugging Face | all-MiniLM-L6-v2 | 384 | Free | Development |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vector Stores" icon="database" href="/ai/vector-stores">
+    Store your embeddings in vector databases
+  </Card>
+  <Card title="RAG Tutorial" icon="book">
+    Build a complete RAG application
+  </Card>
+  <Card title="Text Splitters" icon="scissors">
+    Learn about chunking strategies
+  </Card>
+  <Card title="Semantic Search" icon="search">
+    Implement semantic search
+  </Card>
+</CardGroup>

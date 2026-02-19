@@ -1,0 +1,595 @@
+---
+title: Node Versioning
+description: Manage node versions and handle breaking changes gracefully
+---
+
+# Node Versioning
+
+Node versioning allows you to evolve your nodes over time while maintaining backward compatibility for existing workflows. This guide covers both light versioning and full versioning strategies.
+
+## Why Version Nodes?
+
+Versioning is essential when:
+
+- Adding new features that change parameters
+- Fixing bugs that alter behavior
+- Changing API endpoints or data structures
+- Improving performance with different approaches
+- Deprecating old functionality
+
+<Note>
+  Existing workflows continue to use the node version they were created with. Only new instances use the latest version.
+</Note>
+
+## Light Versioning
+
+Light versioning uses version arrays in the node description. All versions share the same implementation.
+
+### When to Use Light Versioning
+
+- ✅ Minor bug fixes
+- ✅ Adding optional parameters
+- ✅ Small behavior changes
+- ✅ UI improvements
+- ✅ Adding new operations without breaking existing ones
+
+### Implementation
+
+```typescript
+export class GmailTrigger implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'Gmail Trigger',
+    name: 'gmailTrigger',
+    icon: 'file:gmail.svg',
+    group: ['trigger'],
+    version: [1, 1.1, 1.2, 1.3], // Light versioning
+    description: 'Fetches emails from Gmail',
+    // ... rest of description
+  };
+
+  async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+    const node = this.getNode();
+    
+    // Check version for conditional behavior
+    if (node.typeVersion > 1.1) {
+      // New behavior for v1.2+
+      const includeDrafts = filters.includeDrafts ?? false;
+    } else {
+      // Old behavior for v1.0-1.1
+      const includeDrafts = filters.includeDrafts ?? true;
+    }
+
+    // Rest of implementation
+  }
+}
+```
+
+### Version-Specific Behavior
+
+Use `this.getNode().typeVersion` to check the version:
+
+<CodeGroup>
+```typescript Simple Check
+const node = this.getNode();
+
+if (node.typeVersion >= 1.2) {
+  // New behavior
+} else {
+  // Old behavior
+}
+```
+
+```typescript Multiple Versions
+const node = this.getNode();
+
+switch (true) {
+  case node.typeVersion >= 2.0:
+    // v2.0+ behavior
+    break;
+  case node.typeVersion >= 1.5:
+    // v1.5-1.9 behavior
+    break;
+  default:
+    // v1.0-1.4 behavior
+    break;
+}
+```
+
+```typescript In Poll Function
+async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+  const node = this.getNode();
+  
+  // Version-specific initialization
+  let nodeStaticData;
+  if (node.typeVersion > 1) {
+    // v1.1+ uses dictionary for multi-node support
+    const nodeName = node.name;
+    const dictionary = workflowStaticData as Dictionary;
+    nodeStaticData = dictionary[nodeName] ?? {};
+  } else {
+    // v1.0 uses direct static data
+    nodeStaticData = workflowStaticData;
+  }
+
+  // Rest of implementation
+}
+```
+</CodeGroup>
+
+## Full Versioning
+
+Full versioning creates separate implementations for each major version using the `VersionedNodeType` class.
+
+### When to Use Full Versioning
+
+- ✅ Major breaking changes
+- ✅ Complete parameter restructuring
+- ✅ Different execution logic
+- ✅ API version changes
+- ✅ Fundamental architecture changes
+
+### Implementation
+
+Full versioning requires three files:
+
+```
+Set/
+├── Set.node.ts          # Main versioned node
+├── v1/
+│   └── SetV1.node.ts    # Version 1 implementation
+└── v2/
+    └── SetV2.node.ts    # Version 2 implementation
+```
+
+<Steps>
+  <Step title="Create Main Node File">
+    ```typescript
+    // Set.node.ts
+    import type { 
+      INodeTypeBaseDescription, 
+      IVersionedNodeType 
+    } from 'n8n-workflow';
+    import { VersionedNodeType } from 'n8n-workflow';
+
+    import { SetV1 } from './v1/SetV1.node';
+    import { SetV2 } from './v2/SetV2.node';
+
+    export class Set extends VersionedNodeType {
+      constructor() {
+        const baseDescription: INodeTypeBaseDescription = {
+          displayName: 'Set',
+          name: 'set',
+          icon: 'fa:pen',
+          group: ['input'],
+          description: 'Add or edit fields on an input item',
+          defaultVersion: 3.4,
+        };
+
+        const nodeVersions: IVersionedNodeType['nodeVersions'] = {
+          1: new SetV1(baseDescription),
+          2: new SetV1(baseDescription),  // v2 still uses V1 impl
+          3: new SetV2(baseDescription),
+          3.1: new SetV2(baseDescription),
+          3.2: new SetV2(baseDescription),
+          3.3: new SetV2(baseDescription),
+          3.4: new SetV2(baseDescription),
+        };
+
+        super(nodeVersions, baseDescription);
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Create Version 1 Implementation">
+    ```typescript
+    // v1/SetV1.node.ts
+    import type {
+      IExecuteFunctions,
+      INodeExecutionData,
+      INodeType,
+      INodeTypeBaseDescription,
+      INodeTypeDescription,
+    } from 'n8n-workflow';
+
+    export class SetV1 implements INodeType {
+      description: INodeTypeDescription;
+
+      constructor(baseDescription: INodeTypeBaseDescription) {
+        this.description = {
+          ...baseDescription,
+          version: [1, 2],
+          defaults: {
+            name: 'Set',
+            color: '#0000FF',
+          },
+          inputs: ['main'],
+          outputs: ['main'],
+          properties: [
+            // V1-specific parameters
+            {
+              displayName: 'Keep Only Set',
+              name: 'keepOnlySet',
+              type: 'boolean',
+              default: false,
+              description: 'Keep only the values set',
+            },
+            // ... more V1 parameters
+          ],
+        };
+      }
+
+      async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+        // V1 implementation
+        const items = this.getInputData();
+        const keepOnlySet = this.getNodeParameter('keepOnlySet', 0) as boolean;
+
+        // V1 logic
+        return [items];
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Create Version 2 Implementation">
+    ```typescript
+    // v2/SetV2.node.ts
+    import type {
+      IExecuteFunctions,
+      INodeExecutionData,
+      INodeType,
+      INodeTypeBaseDescription,
+      INodeTypeDescription,
+    } from 'n8n-workflow';
+
+    export class SetV2 implements INodeType {
+      description: INodeTypeDescription;
+
+      constructor(baseDescription: INodeTypeBaseDescription) {
+        this.description = {
+          ...baseDescription,
+          version: [3, 3.1, 3.2, 3.3, 3.4],
+          defaults: {
+            name: 'Set',
+            color: '#0000FF',
+          },
+          inputs: ['main'],
+          outputs: ['main'],
+          properties: [
+            // V2-specific parameters (completely different)
+            {
+              displayName: 'Mode',
+              name: 'mode',
+              type: 'options',
+              options: [
+                {
+                  name: 'Manual',
+                  value: 'manual',
+                },
+                {
+                  name: 'Expression',
+                  value: 'expression',
+                },
+              ],
+              default: 'manual',
+            },
+            // ... more V2 parameters
+          ],
+        };
+      }
+
+      async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+        // V2 implementation (completely different from V1)
+        const items = this.getInputData();
+        const mode = this.getNodeParameter('mode', 0) as string;
+
+        // V2 logic
+        return [items];
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Version Migration
+
+When users update node versions, their workflows don't automatically migrate. Consider providing migration helpers:
+
+### Document Breaking Changes
+
+```typescript
+description: INodeTypeDescription = {
+  // ... other properties
+  version: [3, 3.1],
+  hints: [
+    {
+      type: 'warning',
+      message: 'This version has breaking changes. Please review your configuration.',
+      whenToDisplay: 'afterExecution',
+      location: 'outputPane',
+    },
+  ],
+};
+```
+
+### Provide Clear Documentation
+
+In your node documentation, include migration guides:
+
+<Warning>
+  **Breaking Changes in v3.0:**
+  
+  - Removed `keepOnlySet` parameter
+  - Added new `mode` parameter
+  - Changed output format
+  
+  **Migration Steps:**
+  1. Update to latest version
+  2. Reconfigure mode parameter
+  3. Test your workflow
+</Warning>
+
+## Version Strategy Best Practices
+
+<Tabs>
+  <Tab title="Semantic Versioning">
+    Follow semantic versioning principles:
+
+    - **Major** (1.0 → 2.0): Breaking changes
+    - **Minor** (1.0 → 1.1): New features, backward compatible
+    - **Patch** (1.1 → 1.1.1): Bug fixes, backward compatible
+
+    ```typescript
+    // Bug fix - increment patch
+    version: [1, 1.1, 1.1.1]
+
+    // New feature - increment minor
+    version: [1, 1.1, 1.2]
+
+    // Breaking change - increment major
+    version: [1, 2]
+    ```
+  </Tab>
+
+  <Tab title="Default Version">
+    Always set a `defaultVersion` in full versioning:
+
+    ```typescript
+    const baseDescription: INodeTypeBaseDescription = {
+      displayName: 'My Node',
+      name: 'myNode',
+      icon: 'file:mynode.svg',
+      group: ['transform'],
+      description: 'My node description',
+      defaultVersion: 3.4, // Latest stable version
+    };
+    ```
+
+    New node instances will use this version.
+  </Tab>
+
+  <Tab title="Backward Compatibility">
+    Maintain backward compatibility when possible:
+
+    ```typescript
+    async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+      const node = this.getNode();
+      const items = this.getInputData();
+
+      // Maintain old behavior by default
+      let timeout = 5000;
+
+      // New versions have configurable timeout
+      if (node.typeVersion >= 1.2) {
+        timeout = this.getNodeParameter('timeout', 0, 5000) as number;
+      }
+
+      // Use timeout in implementation
+    }
+    ```
+  </Tab>
+
+  <Tab title="Testing Versions">
+    Test all supported versions:
+
+    ```typescript
+    describe('MyNode', () => {
+      describe.each([
+        [1, 'v1'],
+        [1.1, 'v1.1'],
+        [2, 'v2'],
+      ])('version %s', (version, label) => {
+        beforeEach(() => {
+          executeFunctions.getNode.mockReturnValue({
+            name: 'MyNode',
+            typeVersion: version,
+          });
+        });
+
+        it(`${label} should execute correctly`, async () => {
+          // Test version-specific behavior
+        });
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Real-World Example: Gmail Trigger Versions
+
+The Gmail Trigger uses light versioning to evolve behavior:
+
+```typescript
+export class GmailTrigger implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'Gmail Trigger',
+    name: 'gmailTrigger',
+    icon: 'file:gmail.svg',
+    group: ['trigger'],
+    version: [1, 1.1, 1.2, 1.3],
+    // ... rest of description
+  };
+
+  async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+    const node = this.getNode();
+    const workflowStaticData = this.getWorkflowStaticData('node');
+
+    // v1.1+: Support for multiple trigger instances
+    let nodeStaticData;
+    if (node.typeVersion > 1) {
+      const nodeName = node.name;
+      const dictionary = workflowStaticData as Dictionary;
+      if (!(nodeName in workflowStaticData)) {
+        dictionary[nodeName] = {};
+      }
+      nodeStaticData = dictionary[nodeName];
+    } else {
+      nodeStaticData = workflowStaticData;
+    }
+
+    // v1.2+: Changed default for includeDrafts
+    let includeDrafts = false;
+    if (node.typeVersion > 1.1) {
+      includeDrafts = filters.includeDrafts ?? false; // New default
+    } else {
+      includeDrafts = filters.includeDrafts ?? true;  // Old default
+    }
+
+    // v1.3+: Filter out sent emails not in inbox
+    if (
+      node.typeVersion > 1.2 &&
+      fullMessage.labelIds?.includes('SENT') &&
+      !fullMessage.labelIds?.includes('INBOX')
+    ) {
+      continue; // Skip this message
+    }
+
+    // Rest of implementation
+  }
+}
+```
+
+### Version Evolution:
+
+| Version | Change |
+|---------|--------|
+| 1.0 | Initial release |
+| 1.1 | Support multiple trigger instances in same workflow |
+| 1.2 | Changed default `includeDrafts` to `false` |
+| 1.3 | Filter out sent emails not in inbox |
+
+## Deprecation Strategy
+
+When deprecating old versions:
+
+<Steps>
+  <Step title="Add Deprecation Notice">
+    ```typescript
+    description: INodeTypeDescription = {
+      // ... other properties
+      hints: [
+        {
+          type: 'warning',
+          message: 'This version is deprecated. Please upgrade to v3.',
+          whenToDisplay: 'always',
+          location: 'outputPane',
+        },
+      ],
+    };
+    ```
+  </Step>
+
+  <Step title="Provide Migration Path">
+    Document how to migrate in the deprecation notice:
+
+    ```typescript
+    {
+      type: 'info',
+      message: 'To upgrade: 1) Duplicate this node 2) Select v3 3) Reconfigure 4) Test 5) Replace old node',
+      whenToDisplay: 'always',
+      location: 'outputPane',
+    }
+    ```
+  </Step>
+
+  <Step title="Keep Supporting Old Versions">
+    Continue supporting deprecated versions for at least 6-12 months.
+  </Step>
+
+  <Step title="Remove After Grace Period">
+    Only remove old versions after the grace period and multiple warnings.
+  </Step>
+</Steps>
+
+## Version Comparison Table
+
+| Aspect | Light Versioning | Full Versioning |
+|--------|------------------|------------------|
+| **Use Case** | Minor changes | Major rewrites |
+| **Implementation** | Single file | Multiple files |
+| **Code Sharing** | Shared execute() | Separate implementations |
+| **Complexity** | Low | Medium to High |
+| **Maintenance** | Easy | Moderate |
+| **Best For** | Bug fixes, small features | Breaking changes, new architecture |
+| **Example** | Gmail Trigger (v1-1.3) | Set node (v1-3.4) |
+
+## Checklist for Adding New Version
+
+<Steps>
+  <Step title="Decide Versioning Strategy">
+    - [ ] Is this a breaking change?
+    - [ ] Can it be handled with light versioning?
+    - [ ] Do you need full versioning?
+  </Step>
+
+  <Step title="Update Version Number">
+    - [ ] Follow semantic versioning
+    - [ ] Update `version` array
+    - [ ] Update `defaultVersion` (if applicable)
+  </Step>
+
+  <Step title="Implement Version Logic">
+    - [ ] Add version checks in code
+    - [ ] Maintain backward compatibility
+    - [ ] Test old and new versions
+  </Step>
+
+  <Step title="Document Changes">
+    - [ ] Update node documentation
+    - [ ] Add migration guide
+    - [ ] Add deprecation notices (if needed)
+  </Step>
+
+  <Step title="Test Thoroughly">
+    - [ ] Test all supported versions
+    - [ ] Test version-specific behavior
+    - [ ] Test migration paths
+    - [ ] Test with existing workflows
+  </Step>
+</Steps>
+
+## Common Pitfalls
+
+<Warning>
+  Avoid these common versioning mistakes:
+</Warning>
+
+- ❌ Changing behavior without incrementing version
+- ❌ Breaking old versions when adding new features
+- ❌ Not testing all supported versions
+- ❌ Removing old versions too quickly
+- ❌ Not documenting breaking changes
+- ❌ Using full versioning for minor changes
+- ❌ Forgetting to update `defaultVersion`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="book" href="/node-development/overview">
+    Review node development fundamentals
+  </Card>
+  
+  <Card title="Testing" icon="flask" href="/node-development/testing">
+    Test your versioned nodes
+  </Card>
+</CardGroup>

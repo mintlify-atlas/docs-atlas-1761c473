@@ -1,0 +1,765 @@
+---
+title: Core Concepts
+description: Understanding nodes, workflows, triggers, credentials, and expressions in n8n
+---
+
+# Core Concepts
+
+Understand the fundamental building blocks of n8n workflows. This guide explains how nodes, workflows, triggers, credentials, and expressions work together to create powerful automations.
+
+## Workflows
+
+A **workflow** is a collection of connected nodes that execute in a specific order to accomplish a task. Workflows are represented as JSON objects in n8n.
+
+### Workflow Structure
+
+Based on the source code (`packages/workflow/src/interfaces.ts`), a workflow consists of:
+
+```typescript
+interface IWorkflowBase {
+  id: string;                    // Unique workflow identifier
+  name: string;                  // Workflow name
+  active: boolean;               // Whether workflow is activated
+  nodes: INode[];                // Array of nodes
+  connections: IConnections;     // Node connections
+  settings?: IWorkflowSettings;  // Workflow-specific settings
+  staticData?: IDataObject;      // Persistent workflow data
+  pinData?: IPinData;            // Pinned test data
+}
+```
+
+### Workflow Execution Modes
+
+n8n supports several execution modes:
+
+<CardGroup cols={2}>
+  <Card title="Manual" icon="hand">
+    Triggered manually via the UI or API
+  </Card>
+  <Card title="Trigger" icon="bolt">
+    Activated by triggers (webhooks, schedules, polling)
+  </Card>
+  <Card title="Error" icon="triangle-exclamation">
+    Executed when an error workflow is triggered
+  </Card>
+  <Card title="Webhook" icon="webhook">
+    Responds to incoming webhook requests
+  </Card>
+</CardGroup>
+
+### Example Workflow JSON
+
+```json
+{
+  "name": "Data Sync Workflow",
+  "nodes": [
+    {
+      "id": "schedule-1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+        }
+      }
+    },
+    {
+      "id": "http-1",
+      "name": "Fetch Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/data"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Fetch Data", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true
+}
+```
+
+## Nodes
+
+A **node** is a single step in a workflow that performs a specific action. Nodes are the building blocks of automations.
+
+### Node Structure
+
+From the source code, each node has:
+
+```typescript
+interface INode {
+  id: string;                    // Unique node instance ID
+  name: string;                  // Node instance name
+  type: string;                  // Node type (e.g., "n8n-nodes-base.httpRequest")
+  typeVersion: number;           // Node version
+  position: [number, number];    // Canvas position [x, y]
+  parameters: INodeParameters;   // Node configuration
+  credentials?: INodeCredentials; // Attached credentials
+  disabled?: boolean;            // Whether node is disabled
+  continueOnFail?: boolean;      // Continue workflow on error
+}
+```
+
+### Node Types
+
+n8n has several categories of nodes:
+
+#### 1. Trigger Nodes
+
+Trigger nodes start workflow execution:
+
+<Tabs>
+  <Tab title="Webhook Trigger">
+    Listens for incoming HTTP requests
+    
+    ```typescript
+    // From packages/nodes-base/nodes/Webhook/
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "my-webhook",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      }
+    }
+    ```
+    
+    Accessible at: `https://your-domain.com/webhook/my-webhook`
+  </Tab>
+  
+  <Tab title="Schedule Trigger">
+    Executes on a schedule
+    
+    ```json
+    {
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 15 }
+          ]
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Polling Trigger">
+    Periodically checks for new data
+    
+    ```json
+    {
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "parameters": {
+        "event": "messageReceived",
+        "filters": {
+          "subject": "Invoice"
+        }
+      }
+    }
+    ```
+    
+    <Note>
+      Polling triggers use `getWorkflowStaticData('node')` to persist state between polls.
+    </Note>
+  </Tab>
+</Tabs>
+
+#### 2. Action Nodes
+
+Perform operations with services:
+
+```json
+{
+  "name": "Send Email",
+  "type": "n8n-nodes-base.emailSend",
+  "parameters": {
+    "fromEmail": "sender@example.com",
+    "toEmail": "={{ $json.email }}",
+    "subject": "Order Confirmation",
+    "text": "Your order #={{ $json.orderId }} is confirmed"
+  }
+}
+```
+
+#### 3. Core Nodes
+
+Built-in utility nodes:
+
+<CardGroup cols={2}>
+  <Card title="Code" icon="code">
+    Execute JavaScript or Python
+  </Card>
+  <Card title="HTTP Request" icon="globe">
+    Make API calls to any service
+  </Card>
+  <Card title="Set" icon="pen-to-square">
+    Transform and manipulate data
+  </Card>
+  <Card title="IF" icon="code-branch">
+    Conditional routing
+  </Card>
+  <Card title="Switch" icon="shuffle">
+    Multi-way branching
+  </Card>
+  <Card title="Merge" icon="code-merge">
+    Combine data from multiple branches
+  </Card>
+</CardGroup>
+
+### Node Implementation
+
+Nodes implement the `INodeType` interface (from `packages/nodes-base/`):
+
+```typescript
+// Example from packages/nodes-base/nodes/HttpRequest/
+export class HttpRequestV3 implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'HTTP Request',
+    name: 'httpRequest',
+    icon: 'fa:at',
+    group: ['output'],
+    version: [3, 4, 4.1, 4.2, 4.3, 4.4],
+    description: 'Makes an HTTP request',
+    defaults: {
+      name: 'HTTP Request',
+      color: '#0004F5',
+    },
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    properties: [
+      {
+        displayName: 'Method',
+        name: 'method',
+        type: 'options',
+        options: [
+          { name: 'GET', value: 'GET' },
+          { name: 'POST', value: 'POST' },
+          { name: 'PUT', value: 'PUT' },
+          { name: 'DELETE', value: 'DELETE' }
+        ],
+        default: 'GET'
+      },
+      {
+        displayName: 'URL',
+        name: 'url',
+        type: 'string',
+        default: '',
+        required: true
+      }
+    ]
+  };
+
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const returnData: INodeExecutionData[] = [];
+    
+    for (let i = 0; i < items.length; i++) {
+      const method = this.getNodeParameter('method', i) as string;
+      const url = this.getNodeParameter('url', i) as string;
+      
+      const response = await this.helpers.httpRequest({
+        method,
+        url
+      });
+      
+      returnData.push({ json: response });
+    }
+    
+    return [returnData];
+  }
+}
+```
+
+## Connections
+
+Connections define how data flows between nodes.
+
+### Connection Structure
+
+```typescript
+interface IConnection {
+  node: string;              // Destination node name
+  type: NodeConnectionType;  // Connection type (usually "main")
+  index: number;             // Input/output index
+}
+
+interface IConnections {
+  [sourceNodeName: string]: {
+    [connectionType: string]: Array<IConnection[] | null>
+  }
+}
+```
+
+### Connection Types
+
+- **main**: Regular data flow (default)
+- **ai_agent**: AI agent connections
+- **ai_tool**: AI tool connections
+- **ai_memory**: AI memory connections
+- **ai_document**: AI document connections
+
+### Example Connections
+
+```json
+{
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          { "node": "HTTP Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          { "node": "IF", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IF": {
+      "main": [
+        [{ "node": "Success Handler", "type": "main", "index": 0 }],
+        [{ "node": "Error Handler", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
+```
+
+<Note>
+  The `connections` object is indexed by source node. To find parent nodes, use the `mapConnectionsByDestination()` utility from `n8n-workflow`.
+</Note>
+
+## Data Flow
+
+### Node Execution Data
+
+Data passed between nodes follows this structure:
+
+```typescript
+interface INodeExecutionData {
+  json: IDataObject;           // JSON data
+  binary?: IBinaryKeyData;     // Binary files
+  pairedItem?: IPairedItemData; // Source item tracking
+}
+
+interface IBinaryData {
+  data: string;           // Base64 encoded or file ID
+  mimeType: string;       // MIME type
+  fileName?: string;      // Original filename
+  fileExtension?: string; // File extension
+  fileSize?: string;      // Human-readable size
+  bytes?: number;         // Size in bytes
+}
+```
+
+### Processing Multiple Items
+
+Nodes process items in batches:
+
+```javascript
+// In a Code node
+const items = $input.all();
+
+// Process each item
+const results = items.map((item, index) => {
+  return {
+    json: {
+      originalId: item.json.id,
+      processed: true,
+      index: index
+    },
+    pairedItem: { item: index }  // Track source item
+  };
+});
+
+return results;
+```
+
+## Expressions
+
+Expressions allow dynamic data access using the `={{ }}` syntax.
+
+### Accessing Data
+
+<CodeGroup>
+
+```javascript Current Node
+// Access current item data
+{{ $json.fieldName }}
+{{ $json["field-with-dashes"] }}
+{{ $json.nested.field }}
+
+// Access binary data
+{{ $binary.fileName.data }}
+{{ $binary.fileName.mimeType }}
+```
+
+```javascript Previous Nodes
+// Access data from specific node
+{{ $node["Node Name"].json.field }}
+
+// Access specific item from node
+{{ $node["Node Name"].item[0].json.field }}
+
+// Access all items from node
+{{ $node["Node Name"].itemMatching(0).field }}
+```
+
+```javascript Workflow Data
+// Workflow metadata
+{{ $workflow.id }}
+{{ $workflow.name }}
+{{ $workflow.active }}
+
+// Execution data
+{{ $execution.id }}
+{{ $execution.mode }}
+{{ $execution.resumeUrl }}
+
+// Environment
+{{ $env.VARIABLE_NAME }}
+```
+
+</CodeGroup>
+
+### Expression Functions
+
+```javascript
+// String manipulation
+{{ "hello".toUpperCase() }}
+{{ $json.email.toLowerCase() }}
+{{ $json.text.trim() }}
+
+// Date/Time
+{{ $now }}
+{{ $today }}
+{{ DateTime.now().toISO() }}
+{{ DateTime.fromISO($json.date).plus({ days: 7 }).toISO() }}
+
+// Math
+{{ Math.round($json.price * 1.2) }}
+{{ Math.max($json.value1, $json.value2) }}
+
+// Arrays
+{{ $json.items.length }}
+{{ $json.items.map(i => i.name).join(", ") }}
+{{ $json.items.filter(i => i.active) }}
+
+// Conditionals
+{{ $json.status === 'active' ? 'Active' : 'Inactive' }}
+```
+
+<Tip>
+  Expressions use JavaScript syntax and have access to built-in functions from Luxon (dates), lodash (utilities), and standard JavaScript.
+</Tip>
+
+## Credentials
+
+Credentials store authentication information securely.
+
+### Credential Structure
+
+```typescript
+interface ICredentials {
+  id?: string;
+  name: string;      // User-defined credential name
+  type: string;      // Credential type
+  data?: string;     // Encrypted credential data
+}
+
+interface INodeCredentialsDetails {
+  id?: string;
+  name: string;
+}
+```
+
+### Using Credentials in Nodes
+
+Nodes declare credential requirements:
+
+```typescript
+{
+  credentials: [
+    {
+      name: 'httpBasicAuth',
+      required: true,
+      displayOptions: {
+        show: {
+          authentication: ['basicAuth']
+        }
+      }
+    },
+    {
+      name: 'httpHeaderAuth',
+      required: true,
+      displayOptions: {
+        show: {
+          authentication: ['headerAuth']
+        }
+      }
+    }
+  ]
+}
+```
+
+### Accessing Credentials in Code
+
+```javascript
+// In a Code node or custom node
+const credentials = await this.getCredentials('credentialType');
+
+const apiKey = credentials.apiKey;
+const apiUrl = credentials.apiUrl;
+
+// Use in HTTP request
+const response = await this.helpers.httpRequestWithAuthentication(
+  'credentialType',
+  {
+    method: 'GET',
+    url: apiUrl
+  }
+);
+```
+
+### Common Credential Types
+
+<CardGroup cols={2}>
+  <Card title="OAuth2" icon="key">
+    OAuth 2.0 authentication with automatic token refresh
+  </Card>
+  <Card title="API Key" icon="lock">
+    Simple API key authentication
+  </Card>
+  <Card title="Basic Auth" icon="user-lock">
+    Username and password authentication
+  </Card>
+  <Card title="Header Auth" icon="heading">
+    Custom header authentication
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+### Continue on Fail
+
+Control error behavior at the node level:
+
+```json
+{
+  "name": "HTTP Request",
+  "type": "n8n-nodes-base.httpRequest",
+  "continueOnFail": true,
+  "parameters": {
+    "url": "https://api.example.com/data"
+  }
+}
+```
+
+When `continueOnFail` is true, errors are passed to the next node instead of stopping execution.
+
+### Error Workflows
+
+Trigger a separate workflow on error:
+
+1. Create an error workflow with a "Error Trigger" node
+2. In your main workflow settings, select the error workflow
+3. Errors will trigger the error workflow with context:
+
+```json
+{
+  "execution": {
+    "id": "123",
+    "mode": "trigger",
+    "error": {
+      "message": "API request failed",
+      "node": "HTTP Request"
+    }
+  },
+  "workflow": {
+    "id": "456",
+    "name": "Main Workflow"
+  }
+}
+```
+
+### Retry on Fail
+
+Configure automatic retries:
+
+```json
+{
+  "name": "HTTP Request",
+  "retryOnFail": true,
+  "maxTries": 3,
+  "waitBetweenTries": 1000,
+  "parameters": {
+    "url": "https://api.example.com/data"
+  }
+}
+```
+
+## Static Data
+
+Persist data between workflow executions:
+
+```javascript
+// In a Code node or trigger
+const staticData = this.getWorkflowStaticData('node');
+
+// Store last execution time
+if (!staticData.lastRun) {
+  staticData.lastRun = new Date().toISOString();
+}
+
+// Get items since last run
+const newItems = items.filter(item => 
+  new Date(item.json.createdAt) > new Date(staticData.lastRun)
+);
+
+// Update last run time
+staticData.lastRun = new Date().toISOString();
+
+return newItems;
+```
+
+<Warning>
+  Static data is stored in the database and persists across workflow executions. Don't store large amounts of data.
+</Warning>
+
+## Execution Context
+
+Nodes have access to execution context through `this`:
+
+```typescript
+interface IExecuteFunctions {
+  // Get input data
+  getInputData(): INodeExecutionData[];
+  
+  // Get parameter value
+  getNodeParameter(name: string, index: number): any;
+  
+  // Get credentials
+  getCredentials(type: string): Promise<ICredentialDataDecryptedObject>;
+  
+  // Helper functions
+  helpers: {
+    httpRequest(options: IHttpRequestOptions): Promise<any>;
+    httpRequestWithAuthentication(type: string, options): Promise<any>;
+  };
+  
+  // Workflow static data
+  getWorkflowStaticData(type: 'node' | 'global'): IDataObject;
+  
+  // Context
+  getExecutionId(): string;
+  getWorkflow(): IWorkflow;
+  getMode(): WorkflowExecuteMode;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="shield-halved">
+    Always configure error handling for production workflows using `continueOnFail` or error workflows
+  </Card>
+  <Card title="Expressions" icon="code">
+    Use expressions for dynamic data instead of hardcoding values
+  </Card>
+  <Card title="Credentials" icon="lock">
+    Never hardcode credentials in workflows - always use credential system
+  </Card>
+  <Card title="Testing" icon="vial">
+    Test workflows manually before activating with real data
+  </Card>
+  <Card title="Documentation" icon="book">
+    Use node notes to document complex logic
+  </Card>
+  <Card title="Modularity" icon="puzzle-piece">
+    Break complex workflows into smaller, reusable workflows
+  </Card>
+</CardGroup>
+
+## Advanced Topics
+
+### Workflow Versioning
+
+Workflows support versioning:
+
+```typescript
+{
+  "versionId": "abc123",          // Current version ID
+  "activeVersionId": "abc123"     // Active version ID
+}
+```
+
+### Pinned Data
+
+Pin test data to nodes for consistent testing:
+
+```json
+{
+  "pinData": {
+    "HTTP Request": [
+      {
+        "json": {
+          "id": 1,
+          "name": "Test Item"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Sub-workflows
+
+Call other workflows using the "Execute Workflow" node:
+
+```json
+{
+  "name": "Execute Workflow",
+  "type": "n8n-nodes-base.executeWorkflow",
+  "parameters": {
+    "workflowId": "456",
+    "source": "database"
+  }
+}
+```
+
+## Learning Resources
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first workflow
+  </Card>
+  <Card title="Example Workflows" icon="wand-magic-sparkles" href="https://n8n.io/workflows">
+    Browse 900+ templates
+  </Card>
+  <Card title="Node Reference" icon="book" href="https://docs.n8n.io/integrations/">
+    Documentation for all 400+ nodes
+  </Card>
+  <Card title="Community Forum" icon="comments" href="https://community.n8n.io">
+    Ask questions and share workflows
+  </Card>
+</CardGroup>
+
+---
+
+<Note>
+  This documentation is based on n8n version 2.9.0. Core concepts are stable, but specific node implementations may vary by version.
+</Note>

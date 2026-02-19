@@ -1,0 +1,607 @@
+---
+title: Node Structure
+description: Deep dive into INodeType interface and node architecture
+---
+
+# Node Structure
+
+Understanding the structure of an n8n node is essential for building robust integrations. This guide covers the `INodeType` interface and all its components in detail.
+
+## INodeType Interface
+
+Every node implements the `INodeType` interface. Here's the complete structure:
+
+```typescript
+import type {
+  IExecuteFunctions,
+  INodeExecutionData,
+  INodeType,
+  INodeTypeDescription,
+} from 'n8n-workflow';
+
+export class YourNode implements INodeType {
+  description: INodeTypeDescription;
+
+  // Optional methods object
+  methods = {
+    loadOptions: {},
+    listSearch: {},
+    credentialTest: {},
+    resourceMapping: {},
+  };
+
+  // For programmatic nodes
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    // Your logic here
+  }
+
+  // For polling triggers
+  async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+    // Polling logic
+  }
+
+  // For generic triggers
+  async trigger(this: ITriggerFunctions): Promise<ITriggerResponse | undefined> {
+    // Trigger logic
+  }
+
+  // For webhook triggers
+  async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+    // Webhook logic
+  }
+
+  // Webhook lifecycle methods
+  webhookMethods = {
+    default: {
+      async checkExists(this: IHookFunctions): Promise<boolean> {},
+      async create(this: IHookFunctions): Promise<boolean> {},
+      async delete(this: IHookFunctions): Promise<boolean> {},
+    },
+  };
+}
+```
+
+## Node Description
+
+The `description` property defines all node metadata and UI configuration:
+
+<CodeGroup>
+```typescript Basic Description
+export class MyNode implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'My Node',
+    name: 'myNode',
+    icon: 'file:mynode.svg',
+    group: ['transform'],
+    version: 1,
+    subtitle: '={{$parameter["operation"]}}',
+    description: 'Interact with My Service API',
+    defaults: {
+      name: 'My Node',
+    },
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'myServiceApi',
+        required: true,
+      },
+    ],
+    properties: [
+      // Parameters defined here
+    ],
+  };
+}
+```
+
+```typescript Trigger Description
+export class MyTrigger implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'My Trigger',
+    name: 'myTrigger',
+    icon: 'file:mytrigger.svg',
+    group: ['trigger'],
+    version: 1,
+    description: 'Trigger workflow on events',
+    defaults: {
+      name: 'My Trigger',
+    },
+    polling: true, // For polling triggers
+    inputs: [],
+    outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'myServiceApi',
+        required: true,
+      },
+    ],
+    properties: [
+      // Trigger parameters
+    ],
+  };
+}
+```
+
+```typescript Declarative Node
+export class MyDeclarativeNode implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'My API',
+    name: 'myApi',
+    icon: 'file:myapi.svg',
+    group: ['transform'],
+    version: 1,
+    description: 'Interact with My API',
+    defaults: {
+      name: 'My API',
+    },
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
+    requestDefaults: {
+      returnFullResponse: true,
+      baseURL: '={{$credentials.url}}',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    },
+    credentials: [
+      {
+        name: 'myApiAuth',
+        required: true,
+      },
+    ],
+    properties: [
+      // No execute() needed!
+    ],
+  };
+}
+```
+</CodeGroup>
+
+### Description Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `displayName` | string | Yes | Name shown in UI |
+| `name` | string | Yes | Internal node identifier (camelCase) |
+| `icon` | string/Icon | Yes | Node icon (`file:icon.svg` or `fa:icon-name`) |
+| `group` | string[] | Yes | Node category (`['input']`, `['output']`, `['transform']`, `['trigger']`) |
+| `version` | number/number[] | Yes | Node version(s) |
+| `description` | string | Yes | Brief description for UI |
+| `subtitle` | string | No | Dynamic subtitle expression |
+| `defaults` | object | Yes | Default node settings |
+| `inputs` | string[] | Yes | Input connection types |
+| `outputs` | string[] | Yes | Output connection types |
+| `credentials` | array | No | Required credentials |
+| `properties` | array | Yes | Node parameters |
+| `polling` | boolean | No | Set `true` for polling triggers |
+| `requestDefaults` | object | No | For declarative nodes |
+| `usableAsTool` | boolean | No | Can be used as AI agent tool |
+
+## Execute Function
+
+For programmatic nodes, the `execute()` function contains your custom logic:
+
+```typescript
+async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+  const items = this.getInputData();
+  const returnData: INodeExecutionData[] = [];
+
+  // Get parameters
+  const operation = this.getNodeParameter('operation', 0) as string;
+  const resource = this.getNodeParameter('resource', 0) as string;
+
+  // Get credentials
+  const credentials = await this.getCredentials('myServiceApi');
+
+  // Process each item
+  for (let i = 0; i < items.length; i++) {
+    try {
+      let responseData;
+
+      if (resource === 'user') {
+        if (operation === 'create') {
+          const name = this.getNodeParameter('name', i) as string;
+          const email = this.getNodeParameter('email', i) as string;
+
+          responseData = await createUser.call(this, credentials, {
+            name,
+            email,
+          });
+        }
+      }
+
+      returnData.push({
+        json: responseData,
+        pairedItems: { item: i },
+      });
+    } catch (error) {
+      if (this.continueOnFail()) {
+        returnData.push({
+          json: { error: error.message },
+          pairedItems: { item: i },
+        });
+        continue;
+      }
+      throw new NodeOperationError(this.getNode(), error.message, {
+        itemIndex: i,
+      });
+    }
+  }
+
+  return [returnData];
+}
+```
+
+### Key Execute Context Methods
+
+<Tabs>
+  <Tab title="Input/Output">
+    ```typescript
+    // Get input data
+    const items = this.getInputData();
+
+    // Return output
+    return [returnData];
+
+    // Return multiple outputs
+    return [output1, output2];
+    ```
+  </Tab>
+
+  <Tab title="Parameters">
+    ```typescript
+    // Get parameter for specific item
+    const name = this.getNodeParameter('name', itemIndex) as string;
+
+    // Get parameter once (same for all items)
+    const resource = this.getNodeParameter('resource', 0) as string;
+
+    // Get with default value
+    const timeout = this.getNodeParameter('timeout', 0, 5000) as number;
+    ```
+  </Tab>
+
+  <Tab title="Credentials">
+    ```typescript
+    // Get credentials
+    const credentials = await this.getCredentials('myServiceApi');
+
+    // Access credential properties
+    const apiKey = credentials.apiKey as string;
+    const baseUrl = credentials.baseUrl as string;
+    ```
+  </Tab>
+
+  <Tab title="Helpers">
+    ```typescript
+    // Make HTTP request with credentials
+    const response = await this.helpers.requestWithAuthentication.call(
+      this,
+      'myServiceApi',
+      {
+        method: 'GET',
+        url: '/api/users',
+      },
+    );
+
+    // Return JSON array
+    return [this.helpers.returnJsonArray(responseData)];
+
+    // Continue on fail
+    if (this.continueOnFail()) {
+      // Handle error gracefully
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Poll Function (Polling Triggers)
+
+Polling triggers implement the `poll()` function:
+
+```typescript
+import type { IPollFunctions, INodeExecutionData } from 'n8n-workflow';
+import { DateTime } from 'luxon';
+
+async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+  // Get workflow static data for state persistence
+  const workflowStaticData = this.getWorkflowStaticData('node');
+
+  const now = Math.floor(DateTime.now().toSeconds());
+
+  // Initialize on first run
+  if (this.getMode() !== 'manual') {
+    workflowStaticData.lastTimeChecked ??= now;
+  }
+
+  const startDate = workflowStaticData.lastTimeChecked ?? now;
+
+  // Get parameters
+  const filters = this.getNodeParameter('filters', {}) as IDataObject;
+
+  // Fetch new items since last poll
+  const responseData = await fetchNewItems.call(
+    this,
+    startDate,
+    filters,
+  );
+
+  // Return null if no new items
+  if (!responseData || !responseData.length) {
+    return null;
+  }
+
+  // Update last checked time
+  workflowStaticData.lastTimeChecked = now;
+
+  // Return items
+  return [this.helpers.returnJsonArray(responseData)];
+}
+```
+
+<Note>
+  **State Management:** Use `this.getWorkflowStaticData('node')` to persist state between poll intervals. This ensures you only fetch new items.
+</Note>
+
+## Methods Object
+
+The `methods` object provides dynamic functionality:
+
+<CodeGroup>
+```typescript loadOptions
+methods = {
+  loadOptions: {
+    // Load dynamic dropdown options
+    async getUsers(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+      const credentials = await this.getCredentials('myServiceApi');
+      const users = await fetchUsers(credentials);
+
+      return users.map(user => ({
+        name: user.name,
+        value: user.id,
+      }));
+    },
+  },
+};
+```
+
+```typescript listSearch
+methods = {
+  listSearch: {
+    // Resource locator search
+    async searchUsers(
+      this: ILoadOptionsFunctions,
+      filter?: string,
+    ): Promise<INodeListSearchResult> {
+      const credentials = await this.getCredentials('myServiceApi');
+      const users = await searchUsers(credentials, filter);
+
+      return {
+        results: users.map(user => ({
+          name: user.name,
+          value: user.id,
+          url: `https://app.example.com/users/${user.id}`,
+        })),
+      };
+    },
+  },
+};
+```
+
+```typescript credentialTest
+methods = {
+  credentialTest: {
+    async testApiCredentials(
+      this: ICredentialTestFunctions,
+      credential: ICredentialsDecrypted,
+    ): Promise<INodeCredentialTestResult> {
+      const credentials = credential.data as ICredentialDataDecryptedObject;
+
+      try {
+        await testConnection(credentials);
+        return {
+          status: 'OK',
+          message: 'Authentication successful',
+        };
+      } catch (error) {
+        return {
+          status: 'Error',
+          message: error.message,
+        };
+      }
+    },
+  },
+};
+```
+
+```typescript resourceMapping
+methods = {
+  resourceMapping: {
+    // Map fields from external to n8n format
+    async getUsers(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+      return {
+        fields: [
+          {
+            id: 'name',
+            displayName: 'Name',
+            required: true,
+            type: 'string',
+          },
+          {
+            id: 'email',
+            displayName: 'Email',
+            required: true,
+            type: 'string',
+          },
+        ],
+      };
+    },
+  },
+};
+```
+</CodeGroup>
+
+## Webhook Functions
+
+Webhook triggers handle incoming HTTP requests:
+
+```typescript
+webhook = async function(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+  const req = this.getRequestObject();
+  const body = req.body;
+
+  // Process webhook payload
+  return {
+    workflowData: [
+      this.helpers.returnJsonArray([body]),
+    ],
+  };
+};
+
+webhookMethods = {
+  default: {
+    async checkExists(this: IHookFunctions): Promise<boolean> {
+      const webhookUrl = this.getNodeWebhookUrl('default');
+      const webhookData = this.getWorkflowStaticData('node');
+
+      // Check if webhook exists in external service
+      return webhookData.webhookId !== undefined;
+    },
+
+    async create(this: IHookFunctions): Promise<boolean> {
+      const webhookUrl = this.getNodeWebhookUrl('default');
+      const credentials = await this.getCredentials('myServiceApi');
+
+      // Create webhook in external service
+      const webhook = await createWebhook(credentials, webhookUrl);
+
+      // Store webhook ID for later deletion
+      const webhookData = this.getWorkflowStaticData('node');
+      webhookData.webhookId = webhook.id;
+
+      return true;
+    },
+
+    async delete(this: IHookFunctions): Promise<boolean> {
+      const webhookData = this.getWorkflowStaticData('node');
+      const credentials = await this.getCredentials('myServiceApi');
+
+      // Delete webhook from external service
+      if (webhookData.webhookId) {
+        await deleteWebhook(credentials, webhookData.webhookId as string);
+        delete webhookData.webhookId;
+      }
+
+      return true;
+    },
+  },
+};
+```
+
+## Real-World Example: Gmail Trigger
+
+Here's how the Gmail Trigger node implements polling:
+
+```typescript
+export class GmailTrigger implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'Gmail Trigger',
+    name: 'gmailTrigger',
+    icon: 'file:gmail.svg',
+    group: ['trigger'],
+    version: [1, 1.1, 1.2, 1.3],
+    polling: true,
+    inputs: [],
+    outputs: [NodeConnectionTypes.Main],
+    credentials: [
+      {
+        name: 'gmailOAuth2',
+        required: true,
+      },
+    ],
+    properties: [
+      // Gmail-specific parameters
+    ],
+  };
+
+  methods = {
+    loadOptions: {
+      async getLabels(this: ILoadOptionsFunctions) {
+        const labels = await googleApiRequestAllItems.call(
+          this,
+          'labels',
+          'GET',
+          '/gmail/v1/users/me/labels',
+        );
+
+        return labels.map(label => ({
+          name: label.name,
+          value: label.id,
+        }));
+      },
+    },
+  };
+
+  async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+    const workflowStaticData = this.getWorkflowStaticData('node');
+    const now = Math.floor(DateTime.now().toSeconds());
+
+    workflowStaticData.lastTimeChecked ??= now;
+    const startDate = workflowStaticData.lastTimeChecked;
+
+    // Fetch new messages
+    const messages = await fetchMessages.call(this, startDate);
+
+    if (!messages.length) {
+      return null;
+    }
+
+    workflowStaticData.lastTimeChecked = now;
+
+    return [this.helpers.returnJsonArray(messages)];
+  }
+}
+```
+
+## Error Handling Best Practices
+
+<Warning>
+  Always handle errors appropriately in your nodes.
+</Warning>
+
+```typescript
+import { NodeOperationError, NodeApiError } from 'n8n-workflow';
+
+try {
+  // Your operation
+  const response = await apiCall();
+} catch (error) {
+  // For user-facing errors
+  throw new NodeOperationError(
+    this.getNode(),
+    'Failed to create user',
+    {
+      itemIndex: i,
+      description: error.message,
+    },
+  );
+
+  // For API errors
+  throw new NodeApiError(this.getNode(), error, {
+    itemIndex: i,
+  });
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Credentials" icon="key" href="/node-development/credentials">
+    Learn how to implement authentication
+  </Card>
+  
+  <Card title="Testing" icon="flask" href="/node-development/testing">
+    Write comprehensive tests for your nodes
+  </Card>
+</CardGroup>

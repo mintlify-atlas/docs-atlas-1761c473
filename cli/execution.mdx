@@ -1,0 +1,417 @@
+---
+title: Execution Modes
+description: Understanding n8n execution modes, flags, and how to run workflows from the CLI
+---
+
+n8n supports different execution modes for running workflows, each optimized for specific use cases and scaling requirements.
+
+## Execution Modes Overview
+
+<Tabs>
+  <Tab title="Regular Mode">
+    **Regular mode** executes workflows directly in the main process. This is the default mode for single-server deployments.
+    
+    ```bash
+    n8n start
+    ```
+    
+    **Best for:**
+    - Development environments
+    - Small to medium deployments
+    - Simple setups without scaling needs
+    
+    **Characteristics:**
+    - All workflows run in the main process
+    - Simple architecture
+    - No external dependencies (like Redis)
+    - Limited horizontal scaling
+  </Tab>
+  
+  <Tab title="Queue Mode">
+    **Queue mode** uses a message queue (Redis/Bull) to distribute workflow executions across multiple worker processes.
+    
+    ```bash
+    # Start main instance
+    n8n start
+    
+    # Start worker processes (on same or different machines)
+    n8n worker --concurrency=10
+    n8n worker --concurrency=10
+    ```
+    
+    **Best for:**
+    - Production environments
+    - High-volume workflows
+    - Horizontal scaling requirements
+    - Dedicated webhook handling
+    
+    **Characteristics:**
+    - Workflows execute on separate worker processes
+    - Scalable architecture
+    - Requires Redis
+    - Can run workers on multiple machines
+  </Tab>
+</Tabs>
+
+## Configuration
+
+Set the execution mode via environment variable:
+
+<CodeGroup>
+```bash Regular Mode
+export EXECUTIONS_MODE=regular
+n8n start
+```
+
+```bash Queue Mode
+export EXECUTIONS_MODE=queue
+n8n start
+```
+</CodeGroup>
+
+## Worker Process
+
+Workers handle workflow executions in queue mode.
+
+### Starting Workers
+
+```bash
+n8n worker
+```
+
+### Worker Flags
+
+<ParamField path="--concurrency" type="number" default="10">
+  Maximum number of jobs a worker can run simultaneously.
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Low Concurrency (Light Workloads)
+n8n worker --concurrency=3
+```
+
+```bash Standard Concurrency
+n8n worker --concurrency=10
+```
+
+```bash High Concurrency (Powerful Servers)
+n8n worker --concurrency=20
+```
+</CodeGroup>
+
+<Note>
+  **Performance Tip:** Workers with concurrency below 5 may experience instability. Set to at least 5 for production use.
+</Note>
+
+### Worker Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `N8N_CONCURRENCY_PRODUCTION_LIMIT` | Override concurrency setting | -1 (disabled) |
+| `N8N_GRACEFUL_SHUTDOWN_TIMEOUT` | Seconds to wait before force shutdown | 30 |
+
+**Example:**
+
+```bash
+export N8N_CONCURRENCY_PRODUCTION_LIMIT=15
+n8n worker
+```
+
+## Webhook Process
+
+Dedicated webhook handling for improved performance and reliability.
+
+### Starting Webhook Process
+
+```bash
+n8n webhook
+```
+
+<Note>
+  Webhook processes **require queue mode**. They cannot run in regular execution mode.
+</Note>
+
+### Benefits of Separate Webhook Process
+
+- **Isolation**: Webhook handling separated from main process
+- **Scalability**: Run multiple webhook processes
+- **Reliability**: Webhook failures don't affect main instance
+- **Performance**: Dedicated resources for webhook traffic
+
+### Architecture Example
+
+```bash
+# Terminal 1: Main instance
+n8n start
+
+# Terminal 2: Webhook process
+n8n webhook
+
+# Terminal 3: Worker process
+n8n worker --concurrency=10
+
+# Terminal 4: Additional worker
+n8n worker --concurrency=10
+```
+
+## Multi-Main Setup
+
+For high availability, run multiple main instances (Enterprise feature).
+
+<Note>
+  Multi-main setup requires a valid n8n Enterprise license with the "Multiple Main Instances" feature enabled.
+</Note>
+
+**Configuration:**
+
+```bash
+export EXECUTIONS_MODE=queue
+export N8N_MULTI_MAIN_SETUP_ENABLED=true
+
+# Start multiple main instances
+n8n start  # Instance 1
+n8n start  # Instance 2
+n8n start  # Instance 3
+```
+
+**Features:**
+- Leader election for coordinated operations
+- Shared workflow execution queue
+- High availability
+- Zero-downtime deployments
+
+## CLI Execution
+
+Execute workflows directly from the command line.
+
+### Execute Single Workflow
+
+```bash
+n8n execute --id=WORKFLOW_ID
+```
+
+<ParamField path="--id" type="string" required>
+  The workflow ID to execute.
+</ParamField>
+
+<ParamField path="--rawOutput" type="boolean" default="false">
+  Output only JSON data without additional text.
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Execute with Output
+n8n execute --id=abc123
+```
+
+```bash Raw JSON Output
+n8n execute --id=abc123 --rawOutput
+```
+</CodeGroup>
+
+### Execution Behavior
+
+- Always executes in **CLI mode** (not as webhook or trigger)
+- Starts from the workflow's designated start node
+- Does not support queue mode (automatically falls back to regular)
+- Useful for testing and debugging
+
+## Batch Execution
+
+Execute multiple workflows for testing purposes.
+
+```bash
+n8n execute-batch --ids=1,2,3 --concurrency=5
+```
+
+### Common Batch Scenarios
+
+<Tabs>
+  <Tab title="Testing Suite">
+    Run all test workflows with output:
+    
+    ```bash
+    n8n execute-batch \
+      --output=/results/test-run.json \
+      --concurrency=10 \
+      --retries=2
+    ```
+  </Tab>
+  
+  <Tab title="Snapshot Testing">
+    Create snapshots for regression testing:
+    
+    ```bash
+    n8n execute-batch \
+      --snapshot=/snapshots/v2.0 \
+      --shallow
+    ```
+  </Tab>
+  
+  <Tab title="Comparison Testing">
+    Compare against previous execution:
+    
+    ```bash
+    n8n execute-batch \
+      --compare=/snapshots/v1.0 \
+      --output=/results/comparison.json
+    ```
+  </Tab>
+  
+  <Tab title="CI/CD Pipeline">
+    Run in continuous integration:
+    
+    ```bash
+    n8n execute-batch \
+      --ids=/config/test-workflows.txt \
+      --skipList=/config/skip-list.json \
+      --concurrency=5 \
+      --shortOutput \
+      --retries=1
+    ```
+  </Tab>
+</Tabs>
+
+### Skip List Format
+
+Create a JSON file to skip specific workflows:
+
+```json
+[
+  {
+    "workflowId": "123",
+    "status": "broken",
+    "skipReason": "Known issue with external API",
+    "ticketReference": "JIRA-456"
+  },
+  {
+    "workflowId": "456",
+    "status": "deprecated",
+    "skipReason": "Workflow being replaced",
+    "ticketReference": "JIRA-789"
+  }
+]
+```
+
+## Execution Context
+
+Understanding how workflows execute in different contexts:
+
+| Context | Trigger | Use Case |
+|---------|---------|----------|
+| **CLI** | `n8n execute` | Testing, debugging |
+| **Webhook** | HTTP request | External integrations |
+| **Trigger** | Time/event | Automated workflows |
+| **Manual** | UI button | User-initiated |
+
+## Performance Tuning
+
+### Worker Optimization
+
+<CodeGroup>
+```bash Light Workloads
+# More workers, lower concurrency
+n8n worker --concurrency=5  # Worker 1
+n8n worker --concurrency=5  # Worker 2
+n8n worker --concurrency=5  # Worker 3
+```
+
+```bash Heavy Workloads
+# Fewer workers, higher concurrency
+n8n worker --concurrency=20  # Worker 1
+n8n worker --concurrency=20  # Worker 2
+```
+</CodeGroup>
+
+### Concurrency Guidelines
+
+| Server Specs | Recommended Concurrency |
+|--------------|------------------------|
+| 2 CPU, 4GB RAM | 5-8 |
+| 4 CPU, 8GB RAM | 10-15 |
+| 8 CPU, 16GB RAM | 20-30 |
+| 16+ CPU, 32GB+ RAM | 40+ |
+
+<Note>
+  These are starting points. Monitor CPU, memory, and queue length to optimize for your specific workloads.
+</Note>
+
+## Monitoring Execution
+
+### Worker Status
+
+Workers log their status on startup:
+
+```
+n8n worker is now ready
+ * Version: 1.70.0
+ * Concurrency: 10
+```
+
+### Health Checks
+
+Enable health check endpoints for monitoring:
+
+```bash
+export QUEUE_HEALTH_CHECK_ACTIVE=true
+n8n worker
+```
+
+Health endpoint: `http://localhost:5678/healthz`
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Workflow executions stuck in queue">
+    **Problem:** Workflows remain in "running" state but don't execute.
+    
+    **Solutions:**
+    - Check if workers are running: `ps aux | grep "n8n worker"`
+    - Verify Redis connection
+    - Increase worker concurrency
+    - Check worker logs for errors
+  </Accordion>
+  
+  <Accordion title="Worker keeps crashing">
+    **Problem:** Worker process terminates unexpectedly.
+    
+    **Solutions:**
+    - Reduce concurrency (may be overloaded)
+    - Check memory limits
+    - Review workflow complexity
+    - Enable debug logging
+  </Accordion>
+  
+  <Accordion title="Queue mode not working">
+    **Problem:** Executions run in main process despite queue mode.
+    
+    **Solutions:**
+    - Verify `EXECUTIONS_MODE=queue` is set
+    - Check Redis connection string
+    - Ensure Redis is running and accessible
+    - Check for configuration conflicts
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Commands" icon="terminal" href="/cli/commands">
+    View all available CLI commands
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/configuration">
+    Configure execution settings
+  </Card>
+  
+  <Card title="Scaling" icon="arrows-maximize" href="/hosting/scaling">
+    Learn about scaling n8n
+  </Card>
+  
+  <Card title="Queue Mode" icon="list" href="/hosting/scaling/queue-mode">
+    Detailed queue mode documentation
+  </Card>
+</CardGroup>

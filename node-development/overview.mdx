@@ -1,0 +1,324 @@
+---
+title: Node Development Overview
+description: Learn how to build custom nodes for n8n to extend workflow automation capabilities
+---
+
+# Node Development Overview
+
+n8n's extensibility comes from its node-based architecture. Each node is a self-contained unit that performs a specific task in a workflow. This guide will help you understand how to create custom nodes to integrate with any service or API.
+
+## What is a Node?
+
+A node is a TypeScript class that implements the `INodeType` interface. Nodes can:
+
+- **Execute operations** - Perform API calls, data transformations, or custom logic
+- **Trigger workflows** - Start workflows based on webhooks, polling, or events
+- **Process data** - Transform, filter, or enrich data flowing through workflows
+- **Integrate services** - Connect to external APIs and platforms
+
+## Node Types
+
+n8n supports three main types of nodes:
+
+<Tabs>
+  <Tab title="Programmatic Nodes">
+    **Programmatic nodes** use custom TypeScript code in an `execute()` function to perform operations.
+
+    **Use cases:**
+    - Complex data transformations
+    - Custom business logic
+    - Operations requiring conditional processing
+    - Multiple API endpoints with custom routing
+
+    **Example:** Discord v2 node (`nodes/Discord/v2/DiscordV2.node.ts`)
+
+    ```typescript
+    export class DiscordV2 implements INodeType {
+      description: INodeTypeDescription;
+
+      methods = {
+        listSearch,
+        loadOptions,
+      };
+
+      async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+        return await router.call(this);
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Declarative Nodes">
+    **Declarative nodes** use configuration-based routing with `requestDefaults` instead of custom execute logic.
+
+    **Use cases:**
+    - Simple REST API integrations
+    - CRUD operations
+    - Standard HTTP requests
+    - Minimal custom logic
+
+    **Example:** Okta node (`nodes/Okta/Okta.node.ts`)
+
+    ```typescript
+    export class Okta implements INodeType {
+      description: INodeTypeDescription = {
+        displayName: 'Okta',
+        name: 'okta',
+        requestDefaults: {
+          returnFullResponse: true,
+          baseURL: '={{$credentials.url}}',
+          headers: {},
+        },
+        properties: [
+          // Parameter definitions
+        ],
+      };
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Trigger Nodes">
+    **Trigger nodes** start workflows based on external events. There are three types:
+
+    **Webhook Triggers:**
+    - Implement `webhook()` and `webhookMethods`
+    - Example: Microsoft Teams Trigger
+
+    **Polling Triggers:**
+    - Set `polling: true` in description
+    - Implement `poll()` function
+    - Use `getWorkflowStaticData('node')` to persist state
+    - Example: Gmail Trigger
+
+    **Generic Triggers:**
+    - Implement `trigger()` function
+    - For long-running connections (WebSockets, MQTT)
+    - Example: MQTT Trigger
+  </Tab>
+</Tabs>
+
+## INodeType Interface
+
+Every node must implement the `INodeType` interface with these core components:
+
+| Component | Required | Purpose |
+|-----------|----------|----------|
+| `description` | Yes | Node metadata and UI configuration |
+| `execute()` | For programmatic nodes | Custom execution logic |
+| `poll()` | For polling triggers | Periodic data fetching |
+| `trigger()` | For generic triggers | Long-running event listeners |
+| `webhook()` | For webhook triggers | Handle incoming webhooks |
+| `webhookMethods` | For webhook triggers | Webhook lifecycle management |
+| `methods` | Optional | loadOptions, listSearch, credentialTest, resourceMapping |
+
+## Development Workflow
+
+<Steps>
+  <Step title="Plan Your Node">
+    Determine:
+    - Node type (programmatic, declarative, or trigger)
+    - Operations to support (create, read, update, delete, etc.)
+    - Required credentials and authentication method
+    - Parameters users need to configure
+  </Step>
+
+  <Step title="Create Node Structure">
+    ```bash
+    mkdir packages/nodes-base/nodes/YourService
+    cd packages/nodes-base/nodes/YourService
+    touch YourService.node.ts
+    # Add icon SVG files
+    ```
+  </Step>
+
+  <Step title="Implement INodeType">
+    Create the node class with proper description and execution logic.
+
+    See the [Node Structure](/node-development/node-structure) page for details.
+  </Step>
+
+  <Step title="Create Credentials">
+    Define credentials in `packages/nodes-base/credentials/`
+
+    See the [Credentials](/node-development/credentials) page for details.
+  </Step>
+
+  <Step title="Write Tests">
+    Create unit tests following testing guidelines.
+
+    See the [Testing](/node-development/testing) page for details.
+  </Step>
+
+  <Step title="Build and Test">
+    ```bash
+    cd packages/nodes-base
+    pnpm build
+    pnpm test YourService
+    ```
+  </Step>
+</Steps>
+
+## Node Parameters
+
+Nodes define their UI through parameters in the `description.properties` array. Common parameter types:
+
+<CodeGroup>
+```typescript String Input
+{
+  displayName: 'Message',
+  name: 'message',
+  type: 'string',
+  default: '',
+  placeholder: 'Enter your message',
+  description: 'The message to send'
+}
+```
+
+```typescript Dropdown Options
+{
+  displayName: 'Operation',
+  name: 'operation',
+  type: 'options',
+  noDataExpression: true,
+  options: [
+    {
+      name: 'Create',
+      value: 'create',
+    },
+    {
+      name: 'Delete',
+      value: 'delete',
+    },
+  ],
+  default: 'create'
+}
+```
+
+```typescript Resource Locator
+{
+  displayName: 'User',
+  name: 'user',
+  type: 'resourceLocator',
+  default: { mode: 'list', value: '' },
+  modes: [
+    {
+      displayName: 'From List',
+      name: 'list',
+      type: 'list',
+      typeOptions: {
+        searchListMethod: 'searchUsers',
+      },
+    },
+    {
+      displayName: 'By ID',
+      name: 'id',
+      type: 'string',
+    },
+  ],
+}
+```
+
+```typescript Collection
+{
+  displayName: 'Options',
+  name: 'options',
+  type: 'collection',
+  placeholder: 'Add Option',
+  default: {},
+  options: [
+    {
+      displayName: 'Timeout',
+      name: 'timeout',
+      type: 'number',
+      default: 5000,
+    },
+  ],
+}
+```
+</CodeGroup>
+
+## Conditional UI with displayOptions
+
+Use `displayOptions` to show/hide parameters based on other parameter values:
+
+```typescript
+{
+  displayName: 'User ID',
+  name: 'userId',
+  type: 'string',
+  displayOptions: {
+    show: {
+      resource: ['user'],
+      operation: ['get', 'update', 'delete'],
+    },
+  },
+  default: '',
+}
+```
+
+<Note>
+  Use `noDataExpression: true` for resource and operation selectors to prevent expression evaluation in the UI.
+</Note>
+
+## Best Practices
+
+### TypeScript
+- **Never use `any` type** - use proper types or `unknown`
+- **Avoid type casting with `as`** - use type guards instead
+- Define interfaces for API responses
+
+### Error Handling
+- Use `NodeOperationError` for user-facing errors
+- Use `NodeApiError` for API-related errors
+- Support `continueOnFail` option when appropriate
+
+### Code Organization
+- Separate operation/field descriptions into separate files
+- Create reusable API request helpers in GenericFunctions
+- Use kebab-case for files, PascalCase for classes
+
+### UI/UX
+- Use clear `displayName` and `description` fields
+- Set sensible default values
+- Use `displayOptions` to show/hide fields conditionally
+- Add helpful hints and builder hints for AI agents
+
+## Example Nodes Reference
+
+| Node Type | Example Node | Source |
+|-----------|--------------|--------|
+| Programmatic | Discord v2 | `nodes/Discord/v2/DiscordV2.node.ts` |
+| Declarative | Okta | `nodes/Okta/Okta.node.ts` |
+| Webhook Trigger | Microsoft Teams | `nodes/Microsoft/Teams/MicrosoftTeamsTrigger.node.ts` |
+| Polling Trigger | Gmail Trigger | `nodes/Google/Gmail/GmailTrigger.node.ts` |
+| Generic Trigger | MQTT | `nodes/MQTT/MqttTrigger.node.ts` |
+| Versioned | Set | `nodes/Set/Set.node.ts` |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Node Structure" icon="diagram-project" href="/node-development/node-structure">
+    Learn about INodeType interface and node architecture
+  </Card>
+  
+  <Card title="Credentials" icon="key" href="/node-development/credentials">
+    Implement authentication and credential management
+  </Card>
+  
+  <Card title="Testing" icon="flask" href="/node-development/testing">
+    Write comprehensive tests for your nodes
+  </Card>
+  
+  <Card title="Versioning" icon="code-branch" href="/node-development/versioning">
+    Manage node versions and breaking changes
+  </Card>
+</CardGroup>
+
+<Warning>
+  Always build the nodes-base package after making changes:
+  ```bash
+  cd packages/nodes-base
+  pnpm build > build.log 2>&1
+  tail -n 20 build.log
+  ```
+</Warning>

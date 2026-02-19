@@ -1,0 +1,571 @@
+---
+title: Import & Export
+description: Import and export workflows and credentials using the n8n CLI
+---
+
+The n8n CLI provides powerful commands for importing and exporting workflows and credentials. This is useful for backups, migrations, version control, and moving data between environments.
+
+## Export Workflows
+
+Export workflows from your n8n instance to JSON files.
+
+### Basic Usage
+
+```bash
+n8n export:workflow --id=WORKFLOW_ID --output=file.json
+```
+
+### Export Flags
+
+<ParamField path="--all" type="boolean" default="false">
+  Export all workflows from the database.
+</ParamField>
+
+<ParamField path="--id" type="string">
+  The ID of a specific workflow to export.
+</ParamField>
+
+<ParamField path="--output" type="string" shorthand="-o">
+  Output file path or directory (when using `--separate`).
+</ParamField>
+
+<ParamField path="--pretty" type="boolean" default="false">
+  Format JSON output for easier reading.
+</ParamField>
+
+<ParamField path="--separate" type="boolean" default="false">
+  Export each workflow to a separate file. Requires `--output` to be a directory.
+</ParamField>
+
+<ParamField path="--backup" type="boolean" default="false">
+  Shortcut that enables `--all --pretty --separate`. Only requires `--output`.
+</ParamField>
+
+<ParamField path="--version" type="string">
+  The version ID to export (for workflow versioning).
+</ParamField>
+
+<ParamField path="--published" type="boolean" default="false">
+  Export the published/active version of workflows.
+</ParamField>
+
+### Export Examples
+
+<Tabs>
+  <Tab title="Single Workflow">
+    Export one workflow:
+    
+    ```bash
+    n8n export:workflow --id=5 --output=workflow.json
+    ```
+    
+    With pretty formatting:
+    
+    ```bash
+    n8n export:workflow --id=5 --output=workflow.json --pretty
+    ```
+  </Tab>
+  
+  <Tab title="All Workflows">
+    Export all workflows to a single file:
+    
+    ```bash
+    n8n export:workflow --all --output=all-workflows.json
+    ```
+    
+    Export to stdout (no file):
+    
+    ```bash
+    n8n export:workflow --all
+    ```
+  </Tab>
+  
+  <Tab title="Separate Files">
+    Export each workflow to its own file:
+    
+    ```bash
+    n8n export:workflow --all --separate --output=workflows/
+    ```
+    
+    This creates files like:
+    - `workflows/abc123.json`
+    - `workflows/def456.json`
+    - `workflows/ghi789.json`
+  </Tab>
+  
+  <Tab title="Backup">
+    Quick backup of all workflows:
+    
+    ```bash
+    n8n export:workflow --backup --output=backups/2024-01-15/
+    ```
+    
+    Equivalent to:
+    ```bash
+    n8n export:workflow --all --pretty --separate --output=backups/2024-01-15/
+    ```
+  </Tab>
+  
+  <Tab title="Version Export">
+    Export specific version:
+    
+    ```bash
+    n8n export:workflow --id=5 --version=abc-123-def --output=workflow-v2.json
+    ```
+    
+    Export published version:
+    ```bash
+    n8n export:workflow --id=5 --published --output=workflow-published.json
+    ```
+    
+    Export all published versions:
+    ```bash
+    n8n export:workflow --all --published --output=backups/published/
+    ```
+  </Tab>
+</Tabs>
+
+## Import Workflows
+
+Import workflows from JSON files into your n8n instance.
+
+### Basic Usage
+
+```bash
+n8n import:workflow --input=file.json
+```
+
+### Import Flags
+
+<ParamField path="--input" type="string" shorthand="-i" required>
+  Input file path or directory (when using `--separate`).
+</ParamField>
+
+<ParamField path="--separate" type="boolean" default="false">
+  Import all `*.json` files from the specified directory.
+</ParamField>
+
+<ParamField path="--userId" type="string">
+  Assign imported workflows to a specific user ID.
+</ParamField>
+
+<ParamField path="--projectId" type="string">
+  Assign imported workflows to a specific project ID.
+</ParamField>
+
+### Import Examples
+
+<Tabs>
+  <Tab title="Single File">
+    Import one workflow file:
+    
+    ```bash
+    n8n import:workflow --input=workflow.json
+    ```
+  </Tab>
+  
+  <Tab title="Multiple Files">
+    Import all workflows from a directory:
+    
+    ```bash
+    n8n import:workflow --separate --input=backups/latest/
+    ```
+  </Tab>
+  
+  <Tab title="Assign to User">
+    Import and assign to specific user:
+    
+    ```bash
+    n8n import:workflow \
+      --input=workflow.json \
+      --userId=1d64c3d2-85fe-4a83-a649-e446b07b3aae
+    ```
+  </Tab>
+  
+  <Tab title="Assign to Project">
+    Import and assign to specific project:
+    
+    ```bash
+    n8n import:workflow \
+      --input=workflow.json \
+      --projectId=Ox8O54VQrmBrb4qL
+    ```
+  </Tab>
+  
+  <Tab title="Restore Backup">
+    Restore from backup directory:
+    
+    ```bash
+    n8n import:workflow \
+      --separate \
+      --input=backups/2024-01-15/ \
+      --userId=1d64c3d2-85fe-4a83-a649-e446b07b3aae
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  **Ownership Rules:** You cannot use `--userId` and `--projectId` together. If a workflow already exists and is owned by another user/project, the import will fail to prevent accidental ownership changes.
+</Note>
+
+## Export Credentials
+
+Export credentials from your n8n instance.
+
+<Note>
+  **Security Warning:** By default, credentials are exported in encrypted form. Use the `--decrypted` flag only when migrating between instances with different encryption keys.
+</Note>
+
+### Basic Usage
+
+```bash
+n8n export:credentials --id=CREDENTIAL_ID --output=file.json
+```
+
+### Export Credential Flags
+
+<ParamField path="--all" type="boolean" default="false">
+  Export all credentials from the database.
+</ParamField>
+
+<ParamField path="--id" type="string">
+  The ID of a specific credential to export.
+</ParamField>
+
+<ParamField path="--output" type="string" shorthand="-o">
+  Output file path or directory (when using `--separate`).
+</ParamField>
+
+<ParamField path="--pretty" type="boolean" default="false">
+  Format JSON output for easier reading.
+</ParamField>
+
+<ParamField path="--separate" type="boolean" default="false">
+  Export each credential to a separate file.
+</ParamField>
+
+<ParamField path="--backup" type="boolean" default="false">
+  Shortcut that enables `--all --pretty --separate`.
+</ParamField>
+
+<ParamField path="--decrypted" type="boolean" default="false">
+  Export credentials in plain text. **USE WITH CAUTION!** All sensitive information will be visible.
+</ParamField>
+
+### Export Credential Examples
+
+<Tabs>
+  <Tab title="Single Credential">
+    Export one credential (encrypted):
+    
+    ```bash
+    n8n export:credentials --id=5 --output=credential.json
+    ```
+  </Tab>
+  
+  <Tab title="All Credentials">
+    Export all credentials:
+    
+    ```bash
+    n8n export:credentials --all --output=all-credentials.json
+    ```
+  </Tab>
+  
+  <Tab title="Backup">
+    Backup all credentials:
+    
+    ```bash
+    n8n export:credentials --backup --output=backups/credentials/
+    ```
+  </Tab>
+  
+  <Tab title="Decrypted Export">
+    Export with plain text data:
+    
+    ```bash
+    n8n export:credentials \
+      --all \
+      --decrypted \
+      --output=backups/decrypted.json
+    ```
+    
+    <Note>
+      **Warning:** The decrypted file will contain all passwords, API keys, and tokens in plain text. Store it securely and delete after use!
+    </Note>
+  </Tab>
+</Tabs>
+
+## Import Credentials
+
+Import credentials from JSON files into your n8n instance.
+
+### Basic Usage
+
+```bash
+n8n import:credentials --input=file.json
+```
+
+### Import Credential Flags
+
+<ParamField path="--input" type="string" shorthand="-i" required>
+  Input file path or directory (when using `--separate`).
+</ParamField>
+
+<ParamField path="--separate" type="boolean" default="false">
+  Import all `*.json` files from the specified directory.
+</ParamField>
+
+<ParamField path="--userId" type="string">
+  Assign imported credentials to a specific user ID.
+</ParamField>
+
+<ParamField path="--projectId" type="string">
+  Assign imported credentials to a specific project ID.
+</ParamField>
+
+### Import Credential Examples
+
+<Tabs>
+  <Tab title="Single File">
+    Import one credential file:
+    
+    ```bash
+    n8n import:credentials --input=credential.json
+    ```
+  </Tab>
+  
+  <Tab title="Directory Import">
+    Import all credentials from directory:
+    
+    ```bash
+    n8n import:credentials --separate --input=backups/credentials/
+    ```
+  </Tab>
+  
+  <Tab title="Assign to User">
+    Import and assign to user:
+    
+    ```bash
+    n8n import:credentials \
+      --input=credential.json \
+      --userId=1d64c3d2-85fe-4a83-a649-e446b07b3aae
+    ```
+  </Tab>
+  
+  <Tab title="Assign to Project">
+    Import and assign to project:
+    
+    ```bash
+    n8n import:credentials \
+      --input=credential.json \
+      --projectId=Ox8O54VQrmBrb4qL
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  **Encryption Handling:** If you import decrypted credentials (plain text), n8n automatically encrypts them using the instance's encryption key before storing.
+</Note>
+
+## Migration Workflow
+
+### Same Encryption Key
+
+If both instances use the same encryption key:
+
+<CodeGroup>
+```bash Export from Source
+# On source instance
+n8n export:workflow --backup --output=/backup/workflows/
+n8n export:credentials --backup --output=/backup/credentials/
+```
+
+```bash Import to Target
+# On target instance (with same encryption key)
+n8n import:workflow --separate --input=/backup/workflows/
+n8n import:credentials --separate --input=/backup/credentials/
+```
+</CodeGroup>
+
+### Different Encryption Keys
+
+If instances have different encryption keys:
+
+<CodeGroup>
+```bash Export Decrypted
+# On source instance
+n8n export:workflow --all --output=workflows.json
+n8n export:credentials --all --decrypted --output=credentials-plain.json
+```
+
+```bash Import to New Instance
+# On target instance (will re-encrypt with new key)
+n8n import:workflow --input=workflows.json
+n8n import:credentials --input=credentials-plain.json
+
+# Delete plain text file immediately!
+rm credentials-plain.json
+```
+</CodeGroup>
+
+<Note>
+  **Security Best Practice:** Always delete decrypted credential files immediately after import. Never commit them to version control or store them unencrypted.
+</Note>
+
+## Backup Strategy
+
+Recommended backup approach:
+
+<CodeGroup>
+```bash Daily Backup Script
+#!/bin/bash
+
+# Set backup directory with timestamp
+BACKUP_DIR="/backups/n8n/$(date +%Y-%m-%d)"
+mkdir -p "$BACKUP_DIR"
+
+# Export workflows
+n8n export:workflow --backup --output="$BACKUP_DIR/workflows/"
+
+# Export credentials (encrypted)
+n8n export:credentials --backup --output="$BACKUP_DIR/credentials/"
+
+# Create compressed archive
+tar -czf "$BACKUP_DIR.tar.gz" "$BACKUP_DIR"
+
+# Remove uncompressed backup
+rm -rf "$BACKUP_DIR"
+
+echo "Backup completed: $BACKUP_DIR.tar.gz"
+```
+
+```bash Restore from Backup
+#!/bin/bash
+
+BACKUP_FILE="$1"
+
+# Extract backup
+tar -xzf "$BACKUP_FILE"
+BACKUP_DIR="${BACKUP_FILE%.tar.gz}"
+
+# Import workflows
+n8n import:workflow --separate --input="$BACKUP_DIR/workflows/"
+
+# Import credentials
+n8n import:credentials --separate --input="$BACKUP_DIR/credentials/"
+
+echo "Restore completed from: $BACKUP_FILE"
+```
+</CodeGroup>
+
+## Version Control Integration
+
+Export workflows for Git version control:
+
+<CodeGroup>
+```bash Export for Git
+# Export with pretty formatting and separate files
+n8n export:workflow \
+  --all \
+  --separate \
+  --pretty \
+  --output=workflows/
+
+# Add to git
+git add workflows/
+git commit -m "Update workflow definitions"
+git push
+```
+
+```bash .gitignore
+# Don't commit credentials!
+credentials/
+credentials.json
+*-credentials.json
+
+# Ignore decrypted exports
+*-decrypted.json
+*-plain.json
+```
+</CodeGroup>
+
+<Note>
+  **Never commit credentials to version control!** Only export and version control workflows. Store credentials separately using secure secret management.
+</Note>
+
+## Export/Import Best Practices
+
+<AccordionGroup>
+  <Accordion title="Regular Backups">
+    - Schedule automated daily/weekly backups
+    - Store backups in multiple locations
+    - Test restore procedure regularly
+    - Keep backups for at least 30 days
+  </Accordion>
+  
+  <Accordion title="Security">
+    - Never export decrypted credentials unless necessary
+    - Delete decrypted files immediately after use
+    - Store backup files securely with encryption
+    - Use separate credentials for each environment
+  </Accordion>
+  
+  <Accordion title="Version Control">
+    - Use `--pretty --separate` for readable diffs
+    - Only commit workflows, never credentials
+    - Review changes before committing
+    - Tag releases with version numbers
+  </Accordion>
+  
+  <Accordion title="Migration">
+    - Test migration in staging first
+    - Verify workflow IDs and references
+    - Check credential mappings
+    - Update environment-specific values
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Import fails with ownership error">
+    **Problem:** Workflow/credential already exists with different owner.
+    
+    **Solution:** Remove `--userId` or `--projectId` flag to keep existing ownership, or delete the existing item first.
+  </Accordion>
+  
+  <Accordion title="Credentials not working after import">
+    **Problem:** Imported credentials don't work in target instance.
+    
+    **Solutions:**
+    - Ensure same encryption key if importing encrypted
+    - Use `--decrypted` export if keys are different
+    - Re-enter credentials manually if issues persist
+  </Accordion>
+  
+  <Accordion title="Cannot export: directory not found">
+    **Problem:** Output directory doesn't exist.
+    
+    **Solution:** Create directory first or n8n will create it automatically.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Commands" icon="terminal" href="/cli/commands">
+    View all CLI commands
+  </Card>
+  
+  <Card title="User Management" icon="users" href="/cli/user-management">
+    Manage users via CLI
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/configuration">
+    Configure n8n settings
+  </Card>
+  
+  <Card title="Backup & Restore" icon="database" href="/hosting/backup-restore">
+    Complete backup strategies
+  </Card>
+</CardGroup>

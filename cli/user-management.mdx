@@ -1,0 +1,433 @@
+---
+title: User Management
+description: Manage n8n users and reset the database to default user state via CLI
+---
+
+The n8n CLI provides commands for managing users and resetting the instance to its default user state. This is particularly useful for development, testing, and troubleshooting.
+
+## Reset Command
+
+The `user-management:reset` command resets the database to the default user state, making the instance owner the sole user and owner of all workflows and credentials.
+
+### Usage
+
+```bash
+n8n user-management:reset
+```
+
+### What It Does
+
+The reset command performs the following actions:
+
+1. **Transfers All Ownership**: Makes the instance owner the owner of all workflows and credentials
+2. **Deletes Other Users**: Removes all users except the instance owner
+3. **Resets Owner Details**: Clears the owner's personal information:
+   - First name → `null`
+   - Last name → `null`
+   - Email → `null`
+   - Password → `null` (requires setup on next login)
+   - Last active timestamp → `null`
+4. **Handles Orphaned Data**: Links any unassociated credentials to the owner's personal project
+
+<Note>
+  **Warning:** This command is destructive and cannot be undone. All users except the instance owner will be permanently deleted, and the owner's credentials will be reset.
+</Note>
+
+## Use Cases
+
+<Tabs>
+  <Tab title="Development Reset">
+    Clean up test users and data during development:
+    
+    ```bash
+    n8n user-management:reset
+    ```
+    
+    Perfect for resetting a development instance to a clean state.
+  </Tab>
+  
+  <Tab title="Lost Owner Access">
+    Recover access when the instance owner's credentials are lost:
+    
+    ```bash
+    # Stop n8n
+    # Run reset
+    n8n user-management:reset
+    # Restart n8n
+    # Access the setup wizard to create new owner credentials
+    ```
+  </Tab>
+  
+  <Tab title="Instance Handover">
+    Prepare an instance for handover to a new team:
+    
+    ```bash
+    # Remove all user data while keeping workflows
+    n8n user-management:reset
+    ```
+    
+    The new owner can then set up their account via the setup wizard.
+  </Tab>
+  
+  <Tab title="Testing Scenarios">
+    Reset to baseline state for automated testing:
+    
+    ```bash
+    # In test script
+    n8n user-management:reset
+    # Run tests with clean user state
+    ```
+  </Tab>
+</Tabs>
+
+## Behavior Details
+
+### Owner Identification
+
+The command identifies the instance owner as:
+- The user with the `global:owner` role
+- If no owner exists, creates a new default owner user
+
+### Personal Project Handling
+
+The owner's personal project is used for all ownership transfers:
+1. All workflows are assigned to the owner's personal project
+2. All credentials are assigned to the owner's personal project
+3. Orphaned credentials (without any owner) are linked to this project
+
+### Default Owner State
+
+After reset, the owner user has these properties:
+
+```javascript
+{
+  firstName: null,
+  lastName: null,
+  email: null,
+  password: null,
+  lastActiveAt: null,
+  role: "global:owner"
+}
+```
+
+## Post-Reset Setup
+
+After running the reset command:
+
+1. **Restart n8n**:
+   ```bash
+   n8n start
+   ```
+
+2. **Access Setup Wizard**:
+   - Navigate to your n8n URL (e.g., `http://localhost:5678`)
+   - You'll be redirected to the setup wizard
+   - Create new owner credentials
+
+3. **Configure Instance**:
+   - Set owner email and password
+   - Configure instance settings
+   - Add additional users if needed
+
+## Safety Considerations
+
+<AccordionGroup>
+  <Accordion title="Backup Before Reset">
+    Always create a backup before running the reset command:
+    
+    ```bash
+    # Export all workflows
+    n8n export:workflow --backup --output=backup/workflows/
+    
+    # Export all credentials (encrypted)
+    n8n export:credentials --backup --output=backup/credentials/
+    
+    # Now safe to reset
+    n8n user-management:reset
+    ```
+  </Accordion>
+  
+  <Accordion title="Production Warning">
+    **Never run this on a production instance** unless you fully understand the consequences:
+    
+    - All user accounts (except owner) will be deleted
+    - All user sessions will be invalidated
+    - All users will lose access immediately
+    - Owner credentials will be reset
+    - This operation cannot be undone
+  </Accordion>
+  
+  <Accordion title="Data Preservation">
+    The reset command preserves:
+    - ✅ All workflows
+    - ✅ All credentials (data intact)
+    - ✅ Workflow execution history
+    - ✅ System settings
+    
+    But deletes:
+    - ❌ All users except owner
+    - ❌ Owner's personal information
+    - ❌ User sessions
+    - ❌ User preferences
+  </Accordion>
+</AccordionGroup>
+
+## Example Workflows
+
+### Development Reset Workflow
+
+<CodeGroup>
+```bash Complete Reset
+#!/bin/bash
+
+# Stop n8n
+echo "Stopping n8n..."
+pkill -f n8n
+
+# Wait for shutdown
+sleep 2
+
+# Reset to default user state
+echo "Resetting user management..."
+n8n user-management:reset
+
+# Start n8n
+echo "Starting n8n..."
+n8n start > /dev/null 2>&1 &
+
+echo "Reset complete. Access setup wizard at http://localhost:5678"
+```
+
+```bash Reset with Backup
+#!/bin/bash
+
+# Create backup directory
+BACKUP_DIR="backup/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+# Backup workflows and credentials
+echo "Creating backup..."
+n8n export:workflow --backup --output="$BACKUP_DIR/workflows/"
+n8n export:credentials --backup --output="$BACKUP_DIR/credentials/"
+
+# Reset user management
+echo "Resetting user management..."
+n8n user-management:reset
+
+echo "Reset complete. Backup saved to: $BACKUP_DIR"
+```
+</CodeGroup>
+
+### Emergency Access Recovery
+
+If you've lost access to the instance owner account:
+
+<Steps>
+  <Step title="Stop n8n">
+    Stop the n8n process:
+    
+    ```bash
+    # Using systemd
+    sudo systemctl stop n8n
+    
+    # Or using PM2
+    pm2 stop n8n
+    
+    # Or using process kill
+    pkill -f n8n
+    ```
+  </Step>
+  
+  <Step title="Run Reset Command">
+    Execute the reset command:
+    
+    ```bash
+    n8n user-management:reset
+    ```
+    
+    This will reset the owner account while preserving all workflows and credentials.
+  </Step>
+  
+  <Step title="Restart n8n">
+    Start n8n again:
+    
+    ```bash
+    # Using systemd
+    sudo systemctl start n8n
+    
+    # Or using PM2
+    pm2 start n8n
+    
+    # Or directly
+    n8n start
+    ```
+  </Step>
+  
+  <Step title="Complete Setup">
+    Access the n8n UI and complete the setup wizard to create new owner credentials.
+  </Step>
+</Steps>
+
+## User Management Alternatives
+
+For less destructive user management, use the n8n UI:
+
+### Via Web Interface
+
+1. **Settings > Users**: Manage user accounts
+2. **Access Control**: Configure user permissions
+3. **User Roles**: Assign roles to users
+4. **Audit Log**: Track user activities
+
+### Via API
+
+For programmatic user management, use the n8n REST API:
+
+<CodeGroup>
+```bash Get Users
+curl -X GET http://localhost:5678/api/v1/users \
+  -H "X-N8N-API-KEY: your-api-key"
+```
+
+```bash Create User
+curl -X POST http://localhost:5678/api/v1/users \
+  -H "X-N8N-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "global:member"
+  }'
+```
+
+```bash Delete User
+curl -X DELETE http://localhost:5678/api/v1/users/:userId \
+  -H "X-N8N-API-KEY: your-api-key"
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Reset command fails">
+    **Problem:** The reset command encounters an error.
+    
+    **Solutions:**
+    - Ensure n8n is stopped before running reset
+    - Check database connectivity
+    - Verify database permissions
+    - Check logs for specific error messages
+  </Accordion>
+  
+  <Accordion title="Can't access after reset">
+    **Problem:** Cannot access n8n UI after reset.
+    
+    **Solutions:**
+    - Ensure n8n was restarted after reset
+    - Clear browser cache and cookies
+    - Try accessing in incognito/private mode
+    - Check n8n logs for startup errors
+  </Accordion>
+  
+  <Accordion title="Workflows still show old owners">
+    **Problem:** Workflow metadata shows previous owner.
+    
+    **Solution:** This is expected. The reset command changes actual ownership (who can access/modify) but historical metadata may remain. The owner can access and modify all workflows.
+  </Accordion>
+</AccordionGroup>
+
+## Environment-Specific Considerations
+
+<Tabs>
+  <Tab title="Docker">
+    When running in Docker:
+    
+    ```bash
+    # Stop container
+    docker stop n8n
+    
+    # Run reset
+    docker exec n8n n8n user-management:reset
+    
+    # Restart container
+    docker start n8n
+    ```
+    
+    Or if container is not running:
+    
+    ```bash
+    docker run --rm \
+      -v n8n_data:/home/node/.n8n \
+      n8nio/n8n \
+      n8n user-management:reset
+    ```
+  </Tab>
+  
+  <Tab title="Kubernetes">
+    When running in Kubernetes:
+    
+    ```bash
+    # Get pod name
+    POD=$(kubectl get pods -l app=n8n -o jsonpath='{.items[0].metadata.name}')
+    
+    # Run reset in pod
+    kubectl exec $POD -- n8n user-management:reset
+    
+    # Restart pod
+    kubectl delete pod $POD
+    ```
+  </Tab>
+  
+  <Tab title="npm Global">
+    When installed globally via npm:
+    
+    ```bash
+    # Stop n8n (if running as service)
+    sudo systemctl stop n8n
+    
+    # Run reset
+    n8n user-management:reset
+    
+    # Restart
+    sudo systemctl start n8n
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+1. **Always backup first**: Export workflows and credentials before reset
+2. **Use in development**: Primarily for dev/test environments, not production
+3. **Communicate changes**: Inform team members before running reset
+4. **Document recovery**: Keep emergency access recovery procedures documented
+5. **Test restore**: Verify backup/restore procedures work before emergencies
+
+## Related Commands
+
+Other useful CLI commands for user and data management:
+
+- `n8n export:workflow`: Export workflows for backup
+- `n8n export:credentials`: Export credentials for backup
+- `n8n import:workflow`: Restore workflows from backup
+- `n8n import:credentials`: Restore credentials from backup
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Commands" icon="terminal" href="/cli/commands">
+    View all CLI commands
+  </Card>
+  
+  <Card title="Import & Export" icon="arrow-right-arrow-left" href="/cli/import-export">
+    Backup and restore data
+  </Card>
+  
+  <Card title="User Management UI" icon="users-gear" href="/user-management">
+    Manage users via web interface
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Use the REST API for user management
+  </Card>
+</CardGroup>

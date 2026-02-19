@@ -1,0 +1,1162 @@
+---
+title: Action Nodes
+description: Explore n8n action nodes for data transformation, API operations, and workflow logic
+---
+
+# Action Nodes
+
+Action nodes process data, interact with external services, and implement workflow logic. They form the core of your automation workflows, transforming inputs into meaningful outputs.
+
+## Action Node Categories
+
+<CardGroup cols={3}>
+  <Card title="Data Transformation" icon="shuffle">
+    Manipulate, filter, and reshape data
+  </Card>
+  <Card title="API Operations" icon="globe">
+    Interact with external services
+  </Card>
+  <Card title="Flow Control" icon="code-branch">
+    Route and control workflow execution
+  </Card>
+</CardGroup>
+
+## Data Transformation Nodes
+
+Transform data without writing code - these nodes provide powerful manipulation capabilities through intuitive interfaces.
+
+### Set (Edit Fields)
+
+The primary node for data manipulation - add, remove, rename, and transform fields.
+
+<Tabs>
+  <Tab title="Overview">
+    **Operations:**
+    - Add/remove fields
+    - Rename fields
+    - Set values with expressions
+    - Include/exclude fields
+    - Keep only specific fields
+
+    **Modes:**
+    - **Manual** - Define fields explicitly
+    - **Expression** - Use code for field mapping
+    - **Include** - Specify fields to keep
+    - **Exclude** - Remove specific fields
+
+    **When to Use:**
+    - Rename fields for consistency
+    - Add calculated fields
+    - Clean up data structure
+    - Prepare data for next node
+    - Type conversions
+  </Tab>
+
+  <Tab title="Examples">
+    **Add Calculated Fields:**
+    ```json
+    {
+      "mode": "manual",
+      "fields": {
+        "values": [
+          {
+            "name": "fullName",
+            "type": "stringValue",
+            "stringValue": "={{ $json.firstName }} {{ $json.lastName }}"
+          },
+          {
+            "name": "age",
+            "type": "numberValue",
+            "numberValue": "={{ $now.year() - $json.birthYear }}"
+          },
+          {
+            "name": "isPremium",
+            "type": "booleanValue",
+            "booleanValue": "={{ $json.subscriptionTier === 'premium' }}"
+          }
+        ]
+      }
+    }
+    ```
+
+    **Rename and Transform:**
+    ```json
+    {
+      "mode": "manual",
+      "fields": {
+        "values": [
+          {
+            "name": "email",
+            "type": "stringValue",
+            "stringValue": "={{ $json.email_address.toLowerCase().trim() }}"
+          },
+          {
+            "name": "createdDate",
+            "type": "stringValue",
+            "stringValue": "={{ $json.created_at.toDate().format('yyyy-MM-dd') }}"
+          }
+        ]
+      },
+      "options": {
+        "dotNotation": true
+      }
+    }
+    ```
+
+    **Keep Only Specific Fields:**
+    ```json
+    {
+      "mode": "include",
+      "include": "selectedFields",
+      "includeFields": "id, name, email, status"
+    }
+    ```
+
+    **Remove Sensitive Data:**
+    ```json
+    {
+      "mode": "exclude",
+      "exclude": "selectedFields",
+      "excludeFields": "password, ssn, creditCard"
+    }
+    ```
+  </Tab>
+
+  <Tab title="Use Cases">
+    **Data Normalization:**
+    - Standardize email formats
+    - Normalize phone numbers
+    - Clean up addresses
+    - Consistent date formats
+
+    **API Preparation:**
+    - Map to required field names
+    - Convert types
+    - Add required fields
+    - Remove extra fields
+
+    **Calculated Values:**
+    - Compute totals
+    - Calculate dates
+    - String concatenation
+    - Boolean logic
+
+    **Privacy:**
+    - Remove PII
+    - Mask sensitive data
+    - Filter fields
+  </Tab>
+</Tabs>
+
+### Filter
+
+Keep or remove items based on conditions - essential for data quality and routing.
+
+<Tabs>
+  <Tab title="Conditions">
+    **Comparison Operators:**
+    - **String:** equals, not equals, contains, not contains, starts with, ends with, regex
+    - **Number:** equals, not equals, larger, smaller, larger or equal, smaller or equal
+    - **Boolean:** true, false, equals
+    - **Date:** equals, after, before, after or equal, before or equal
+    - **Array:** contains, not contains, length equals, is empty, is not empty
+    - **Exists:** is empty, is not empty, exists, does not exist
+
+    **Logical Combinators:**
+    - **AND** - All conditions must match
+    - **OR** - Any condition must match
+
+    **Example - Complex Filter:**
+    ```json
+    {
+      "conditions": {
+        "combinator": "and",
+        "conditions": [
+          {
+            "leftValue": "={{ $json.status }}",
+            "operator": "equals",
+            "rightValue": "active"
+          },
+          {
+            "leftValue": "={{ $json.amount }}",
+            "operator": "gt",
+            "rightValue": 100
+          },
+          {
+            "leftValue": "={{ $json.email }}",
+            "operator": "contains",
+            "rightValue": "@company.com"
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Examples">
+    **Filter Active Users:**
+    ```json
+    {
+      "conditions": {
+        "conditions": [
+          {
+            "leftValue": "={{ $json.status }}",
+            "operator": "equals",
+            "rightValue": "active"
+          },
+          {
+            "leftValue": "={{ $json.lastLoginDate }}",
+            "operator": "after",
+            "rightValue": "={{ $now.minus(30, 'days') }}"
+          }
+        ],
+        "combinator": "and"
+      }
+    }
+    ```
+
+    **Filter by Email Domain:**
+    ```json
+    {
+      "conditions": {
+        "conditions": [
+          {
+            "leftValue": "={{ $json.email }}",
+            "operator": "regex",
+            "rightValue": ".*@(company\\.com|partner\\.com)$"
+          }
+        ]
+      }
+    }
+    ```
+
+    **Filter Empty Values:**
+    ```json
+    {
+      "conditions": {
+        "conditions": [
+          {
+            "leftValue": "={{ $json.description }}",
+            "operator": "isNotEmpty"
+          },
+          {
+            "leftValue": "={{ $json.tags }}",
+            "operator": "isNotEmpty"
+          }
+        ],
+        "combinator": "and"
+      }
+    }
+    ```
+
+    **Date Range Filter:**
+    ```json
+    {
+      "conditions": {
+        "conditions": [
+          {
+            "leftValue": "={{ $json.date }}",
+            "operator": "afterOrEqual",
+            "rightValue": "2024-01-01"
+          },
+          {
+            "leftValue": "={{ $json.date }}",
+            "operator": "before",
+            "rightValue": "2024-12-31"
+          }
+        ],
+        "combinator": "and"
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Best Practices">
+    **Performance:**
+    - Filter early in workflow
+    - Use simple conditions when possible
+    - Avoid complex regex on large datasets
+    - Consider multiple filter nodes vs. complex conditions
+
+    **Maintenance:**
+    - Use descriptive field names in expressions
+    - Document complex logic
+    - Test edge cases
+    - Consider using Switch for multi-way routing
+
+    **Data Quality:**
+    - Filter null/undefined values
+    - Validate data types
+    - Check for required fields
+    - Remove duplicates (use RemoveDuplicates node)
+  </Tab>
+</Tabs>
+
+### Transform Nodes Collection
+
+<Accordion title="Aggregate">
+  **Purpose:** Combine multiple items into a single item with aggregated values.
+
+  **Operations:**
+  - Sum, average, min, max
+  - Count items
+  - Concatenate strings
+  - Collect arrays
+  - Group by fields
+
+  **Example - Sum by Category:**
+  ```json
+  {
+    "aggregate": "aggregateIndividualFields",
+    "fieldsToAggregate": {
+      "values": [
+        {
+          "fieldToAggregate": "amount",
+          "operation": "sum",
+          "outputFieldName": "totalAmount"
+        },
+        {
+          "fieldToAggregate": "id",
+          "operation": "count",
+          "outputFieldName": "itemCount"
+        }
+      ]
+    },
+    "options": {
+      "groupBy": "category"
+    }
+  }
+  ```
+
+  **Use Cases:**
+  - Calculate totals
+  - Generate statistics
+  - Count occurrences
+  - Group data
+</Accordion>
+
+<Accordion title="Split Out">
+  **Purpose:** Split arrays into separate items - opposite of aggregation.
+
+  **Example:**
+  
+  **Input:**
+  ```json
+  {
+    "orders": [
+      { "id": 1, "product": "A" },
+      { "id": 2, "product": "B" }
+    ]
+  }
+  ```
+
+  **Configuration:**
+  ```json
+  {
+    "fieldToSplitOut": "orders",
+    "options": {
+      "include": "selectedOtherFields",
+      "includeFields": "customerId, date"
+    }
+  }
+  ```
+
+  **Output:**
+  ```json
+  { "id": 1, "product": "A", "customerId": "123" }
+  { "id": 2, "product": "B", "customerId": "123" }
+  ```
+
+  **Use Cases:**
+  - Process array items individually
+  - Flatten nested data
+  - Loop over items
+</Accordion>
+
+<Accordion title="Sort">
+  **Purpose:** Order items by field values.
+
+  **Configuration:**
+  ```json
+  {
+    "sortFieldsUi": {
+      "sortField": [
+        {
+          "fieldName": "date",
+          "order": "descending"
+        },
+        {
+          "fieldName": "amount",
+          "order": "ascending"
+        }
+      ]
+    }
+  }
+  ```
+
+  **Features:**
+  - Multiple sort fields
+  - Ascending/descending
+  - Type-aware sorting
+  - Null handling
+
+  **Use Cases:**
+  - Order by date
+  - Prioritize items
+  - Rank results
+</Accordion>
+
+<Accordion title="Limit">
+  **Purpose:** Restrict the number of items returned.
+
+  **Configuration:**
+  ```json
+  {
+    "maxItems": 10,
+    "keepMissing": false
+  }
+  ```
+
+  **Use Cases:**
+  - Take top N results
+  - Pagination
+  - Sample data
+  - Prevent overload
+</Accordion>
+
+<Accordion title="Remove Duplicates">
+  **Purpose:** Eliminate duplicate items based on field values.
+
+  **Configuration:**
+  ```json
+  {
+    "compare": "selectedFields",
+    "fieldsToCompare": {
+      "fields": [
+        { "fieldName": "email" },
+        { "fieldName": "userId" }
+      ]
+    }
+  }
+  ```
+
+  **Options:**
+  - All fields
+  - Selected fields
+  - Expression-based
+
+  **Use Cases:**
+  - Deduplicate records
+  - Unique emails
+  - Clean data
+</Accordion>
+
+<Accordion title="Summarize">
+  **Purpose:** Create pivot tables and data summaries.
+
+  **Configuration:**
+  ```json
+  {
+    "aggregate": "aggregateIndividualFields",
+    "fieldsToAggregate": {
+      "values": [
+        {
+          "fieldToAggregate": "revenue",
+          "operation": "sum"
+        }
+      ]
+    },
+    "groupBy": "region, quarter"
+  }
+  ```
+
+  **Use Cases:**
+  - Pivot tables
+  - Sales reports
+  - Analytics summaries
+</Accordion>
+
+### Date & Time
+
+<Card title="DateTime Node" icon="calendar">
+  **Operations:**
+  - Format dates
+  - Calculate date differences
+  - Add/subtract time
+  - Convert timezones
+  - Parse date strings
+
+  **Examples:**
+
+  **Format Date:**
+  ```json
+  {
+    "action": "format",
+    "date": "={{ $json.createdAt }}",
+    "format": "yyyy-MM-dd HH:mm:ss",
+    "outputFieldName": "formattedDate"
+  }
+  ```
+
+  **Add Days:**
+  ```json
+  {
+    "action": "calculate",
+    "date": "={{ $now }}",
+    "operation": "add",
+    "duration": 7,
+    "timeUnit": "days"
+  }
+  ```
+
+  **Calculate Age:**
+  ```json
+  {
+    "action": "getTimeBetweenDates",
+    "startDate": "={{ $json.birthDate }}",
+    "endDate": "={{ $now }}",
+    "units": "years"
+  }
+  ```
+</Card>
+
+## Flow Control Nodes
+
+Control workflow execution path based on conditions and logic.
+
+### If Node
+
+<Tabs>
+  <Tab title="Overview">
+    **Purpose:** Route items to True or False branches based on conditions.
+
+    **Outputs:**
+    - **True** - Items that match conditions
+    - **False** - Items that don't match
+
+    **When to Use:**
+    - Binary decision points
+    - Conditional routing
+    - Error handling paths
+    - Validation checks
+
+    **vs. Filter Node:**
+    - **If** - Routes to different paths
+    - **Filter** - Removes items from single path
+  </Tab>
+
+  <Tab title="Configuration">
+    **Simple Condition:**
+    ```json
+    {
+      "conditions": {
+        "conditions": [
+          {
+            "leftValue": "={{ $json.amount }}",
+            "operator": "largerOrEqual",
+            "rightValue": 1000
+          }
+        ]
+      }
+    }
+    ```
+
+    **Multiple Conditions (AND):**
+    ```json
+    {
+      "conditions": {
+        "combinator": "and",
+        "conditions": [
+          {
+            "leftValue": "={{ $json.status }}",
+            "operator": "equals",
+            "rightValue": "pending"
+          },
+          {
+            "leftValue": "={{ $json.priority }}",
+            "operator": "equals",
+            "rightValue": "high"
+          }
+        ]
+      }
+    }
+    ```
+
+    **Multiple Conditions (OR):**
+    ```json
+    {
+      "conditions": {
+        "combinator": "or",
+        "conditions": [
+          {
+            "leftValue": "={{ $json.type }}",
+            "operator": "equals",
+            "rightValue": "urgent"
+          },
+          {
+            "leftValue": "={{ $json.amount }}",
+            "operator": "larger",
+            "rightValue": 10000
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Use Cases">
+    **Approval Workflows:**
+    ```
+    If amount >= 1000:
+      True → Send to manager
+      False → Auto-approve
+    ```
+
+    **Error Handling:**
+    ```
+    If API call successful:
+      True → Continue workflow
+      False → Send error notification
+    ```
+
+    **Data Validation:**
+    ```
+    If email is valid:
+      True → Add to mailing list
+      False → Log invalid entry
+    ```
+
+    **Tiered Processing:**
+    ```
+    If premium customer:
+      True → Priority queue
+      False → Standard queue
+    ```
+  </Tab>
+</Tabs>
+
+### Switch Node
+
+<Card title="Switch Node" icon="code-branch">
+  **Purpose:** Route items to multiple branches based on rules.
+
+  **Configuration:**
+  ```json
+  {
+    "mode": "rules",
+    "rules": {
+      "rules": [
+        {
+          "output": 0,
+          "conditions": {
+            "conditions": [
+              {
+                "leftValue": "={{ $json.priority }}",
+                "operator": "equals",
+                "rightValue": "urgent"
+              }
+            ]
+          }
+        },
+        {
+          "output": 1,
+          "conditions": {
+            "conditions": [
+              {
+                "leftValue": "={{ $json.priority }}",
+                "operator": "equals",
+                "rightValue": "high"
+              }
+            ]
+          }
+        },
+        {
+          "output": 2,
+          "conditions": {
+            "conditions": [
+              {
+                "leftValue": "={{ $json.priority }}",
+                "operator": "equals",
+                "rightValue": "medium"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "fallbackOutput": 3
+  }
+  ```
+
+  **Use Cases:**
+  - Multi-tier routing
+  - Category-based processing
+  - Priority queues
+  - Status-based workflows
+</Card>
+
+### Merge Node
+
+<Tabs>
+  <Tab title="Merge Modes">
+    **Append:**
+    - Combine all items from all branches
+    - No matching required
+    - Simple concatenation
+
+    **Keep Key Matches:**
+    - Join items with matching field values
+    - Like SQL JOIN
+    - Merge on common key
+
+    **Merge By Index:**
+    - Combine items at same position
+    - Index-based matching
+    - Pair items 1:1
+
+    **Multiplex:**
+    - Create all combinations
+    - Cartesian product
+    - Each item paired with every other
+  </Tab>
+
+  <Tab title="Examples">
+    **Append All Items:**
+    ```json
+    {
+      "mode": "append"
+    }
+    ```
+
+    **Merge by Email:**
+    ```json
+    {
+      "mode": "combine",
+      "mergeByFields": {
+        "values": [
+          {
+            "field1": "email",
+            "field2": "email"
+          }
+        ]
+      },
+      "options": {
+        "joinMode": "keepMatches"
+      }
+    }
+    ```
+
+    **Merge by Index:**
+    ```json
+    {
+      "mode": "mergeByPosition",
+      "options": {
+        "clashHandling": {
+          "values": {
+            "resolveConflict": "preferInput2"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Use Cases">
+    **Enrich Data:**
+    - Merge user data with order data
+    - Add product details to cart items
+    - Combine multiple API responses
+
+    **Parallel Processing:**
+    - Merge results from parallel branches
+    - Combine processed data
+    - Aggregate split workflows
+
+    **Data Joining:**
+    - SQL-like joins
+    - Lookup enrichment
+    - Reference data addition
+  </Tab>
+</Tabs>
+
+## Code Execution Nodes
+
+<Warning>
+Use Code nodes as a **last resort**. Native nodes are faster, more maintainable, and easier to debug.
+</Warning>
+
+### Code Node
+
+<Tabs>
+  <Tab title="JavaScript">
+    **Access Input Data:**
+    ```javascript
+    // Get all items
+    const items = $input.all();
+
+    // Process each item
+    const results = items.map(item => ({
+      json: {
+        fullName: `${item.json.firstName} ${item.json.lastName}`,
+        email: item.json.email.toLowerCase(),
+        timestamp: new Date().toISOString()
+      }
+    }));
+
+    return results;
+    ```
+
+    **Use Node Context:**
+    ```javascript
+    // Access workflow data
+    const workflowData = $workflow.staticData;
+
+    // Get execution context
+    const executionId = $execution.id;
+    const mode = $execution.mode;  // 'manual' or 'trigger'
+
+    // Access environment variables
+    const apiKey = $env.API_KEY;
+
+    return $input.all();
+    ```
+
+    **Date Manipulation:**
+    ```javascript
+    // Luxon is available
+    const { DateTime } = require('luxon');
+
+    const items = $input.all();
+
+    const processed = items.map(item => ({
+      json: {
+        ...item.json,
+        formattedDate: DateTime.fromISO(item.json.date)
+          .setZone('America/New_York')
+          .toFormat('yyyy-MM-dd HH:mm:ss')
+      }
+    }));
+
+    return processed;
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    **Basic Processing:**
+    ```python
+    import pandas as pd
+    from datetime import datetime
+
+    # Get input items
+    items = _input.all()
+
+    # Convert to DataFrame
+    data = [item['json'] for item in items]
+    df = pd.DataFrame(data)
+
+    # Process data
+    df['fullName'] = df['firstName'] + ' ' + df['lastName']
+    df['email'] = df['email'].str.lower()
+    df['timestamp'] = datetime.now()
+
+    # Return results
+    return df.to_dict('records')
+    ```
+
+    **Data Analysis:**
+    ```python
+    import pandas as pd
+    import numpy as np
+
+    # Load data
+    items = [item['json'] for item in _input.all()]
+    df = pd.DataFrame(items)
+
+    # Calculate statistics
+    summary = df.groupby('category').agg({
+        'amount': ['sum', 'mean', 'count'],
+        'revenue': 'sum'
+    }).reset_index()
+
+    # Convert to records
+    return summary.to_dict('records')
+    ```
+  </Tab>
+
+  <Tab title="When to Use">
+    **✅ Appropriate Use Cases:**
+    - Complex multi-step algorithms
+    - Custom data structures
+    - Scientific computing (Python)
+    - Complex date/time logic
+    - External library requirements
+
+    **❌ Avoid Code Node For:**
+    - Simple field mapping → Use **Set**
+    - Filtering items → Use **Filter**
+    - Conditional routing → Use **If** or **Switch**
+    - Splitting arrays → Use **Split Out**
+    - Aggregating data → Use **Aggregate**
+    - Merging data → Use **Merge**
+    - Date formatting → Use **DateTime**
+
+    **Performance Impact:**
+    - Code nodes run in sandboxed environment
+    - Slower than native nodes
+    - Memory overhead
+    - Limited external package support
+  </Tab>
+</Tabs>
+
+## Utility Nodes
+
+<Accordion title="Wait">
+  **Purpose:** Pause workflow execution for a duration or until a specific time.
+
+  **Configuration:**
+  ```json
+  {
+    "unit": "minutes",
+    "amount": 5
+  }
+  ```
+
+  **Use Cases:**
+  - Rate limiting
+  - Scheduled delays
+  - Cooldown periods
+  - Waiting for async operations
+</Accordion>
+
+<Accordion title="Stop and Error">
+  **Purpose:** Halt workflow execution with or without error.
+
+  **Configuration:**
+  ```json
+  {
+    "errorMessage": "Validation failed: {{ $json.error }}"
+  }
+  ```
+
+  **Use Cases:**
+  - Validation failures
+  - Business rule violations
+  - Graceful termination
+  - Error propagation
+</Accordion>
+
+<Accordion title="Execute Workflow">
+  **Purpose:** Call another workflow from current workflow.
+
+  **Configuration:**
+  ```json
+  {
+    "workflowId": "123",
+    "waitForWorkflow": true,
+    "jsonData": "={{ $json }}"
+  }
+  ```
+
+  **Use Cases:**
+  - Reusable sub-workflows
+  - Modular design
+  - Complex orchestration
+  - Workflow composition
+</Accordion>
+
+<Accordion title="NoOp">
+  **Purpose:** Do nothing - pass data through unchanged.
+
+  **Use Cases:**
+  - Workflow documentation
+  - Visual organization
+  - Placeholder for future nodes
+  - Connection point
+</Accordion>
+
+<Accordion title="Sticky Note">
+  **Purpose:** Add annotations and documentation to canvas.
+
+  **Use Cases:**
+  - Document workflow logic
+  - Explain complex sections
+  - Add warnings
+  - Team collaboration notes
+</Accordion>
+
+## File Processing Nodes
+
+<Accordion title="Read/Write File">
+  **Operations:**
+  - Read binary files
+  - Write binary files
+  - Convert to/from base64
+  - Handle file metadata
+
+  **Example:**
+  ```json
+  {
+    "operation": "read",
+    "filePath": "/data/reports/{{ $json.filename }}",
+    "dataPropertyName": "fileData"
+  }
+  ```
+</Accordion>
+
+<Accordion title="Convert to File">
+  **Purpose:** Convert JSON/text data to file.
+
+  **Configuration:**
+  ```json
+  {
+    "operation": "toText",
+    "options": {
+      "fileName": "report.csv",
+      "mimeType": "text/csv"
+    }
+  }
+  ```
+</Accordion>
+
+<Accordion title="Extract From File">
+  **Purpose:** Extract data from files (CSV, JSON, XML, PDF).
+
+  **Example:**
+  ```json
+  {
+    "operation": "csv",
+    "binaryPropertyName": "data",
+    "options": {
+      "delimiter": ",",
+      "headerRow": true
+    }
+  }
+  ```
+</Accordion>
+
+<Accordion title="Compression">
+  **Operations:**
+  - Compress files (zip, gzip)
+  - Decompress archives
+  - Multiple file handling
+
+  **Use Cases:**
+  - File archiving
+  - Reduce transfer size
+  - Backup compression
+</Accordion>
+
+## HTTP & API Nodes
+
+### HTTP Request
+
+Detailed in [Popular Nodes](/integrations/popular-nodes#http-request), the HTTP Request node is the most versatile action node for API integration.
+
+### GraphQL
+
+<Card title="GraphQL Node" icon="diagram-project">
+  **Purpose:** Execute GraphQL queries and mutations.
+
+  **Example Query:**
+  ```graphql
+  query GetUser($id: ID!) {
+    user(id: $id) {
+      name
+      email
+      posts {
+        title
+        createdAt
+      }
+    }
+  }
+  ```
+
+  **Configuration:**
+  ```json
+  {
+    "operation": "query",
+    "query": "...",
+    "variables": {
+      "id": "={{ $json.userId }}"
+    }
+  }
+  ```
+</Card>
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Performance">
+    **Optimize Data Flow:**
+    - Filter data early
+    - Use native nodes over Code
+    - Limit API calls
+    - Batch operations when possible
+
+    **Avoid Bottlenecks:**
+    - Don't process unnecessary fields
+    - Remove unused data
+    - Use Set node to clean up
+    - Consider splitting large workflows
+
+    **Memory Management:**
+    - Limit item count with Limit node
+    - Clear large binary data
+    - Avoid storing full responses
+  </Tab>
+
+  <Tab title="Error Handling">
+    **Use Try-Catch Pattern:**
+    ```
+    Action Node (continueOnFail: true)
+      → If (check for error)
+        True → Error handling path
+        False → Continue workflow
+    ```
+
+    **Validate Data:**
+    - Use Filter for validation
+    - Check required fields
+    - Verify data types
+    - Handle edge cases
+
+    **Provide Context:**
+    - Log meaningful errors
+    - Include item data in errors
+    - Set error messages in Stop and Error
+  </Tab>
+
+  <Tab title="Maintainability">
+    **Use Descriptive Names:**
+    - Clear node names
+    - Document complex logic
+    - Use Sticky Notes
+
+    **Modular Design:**
+    - Break into sub-workflows
+    - Reusable components
+    - Clear data contracts
+
+    **Version Control:**
+    - Export workflows
+    - Document changes
+    - Test before deployment
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trigger Nodes" icon="play" href="/integrations/triggers">
+    Learn how to start workflows automatically
+  </Card>
+  <Card title="Popular Nodes" icon="star" href="/integrations/popular-nodes">
+    Explore commonly used integrations
+  </Card>
+  <Card title="Build Workflows" icon="diagram-project" href="/quickstart">
+    Create your first automated workflow
+  </Card>
+  <Card title="Expressions" icon="code" href="/essentials/expressions">
+    Master data transformation with expressions
+  </Card>
+</CardGroup>

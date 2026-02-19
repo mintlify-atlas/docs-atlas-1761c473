@@ -1,0 +1,882 @@
+---
+title: Configuration
+description: Complete reference for n8n environment variables and configuration options for self-hosted deployments.
+---
+
+n8n is configured primarily through environment variables, allowing flexible deployment across different environments. This guide covers all major configuration options.
+
+## Core Configuration
+
+### Instance Settings
+
+<ParamField path="N8N_ENCRYPTION_KEY" type="string" required>
+  Encryption key for securing credentials in the database.
+  
+  ```bash
+  N8N_ENCRYPTION_KEY=your-secure-key-min-10-chars
+  ```
+  
+  <Warning>
+    - Minimum 10 characters
+    - Generate with: `openssl rand -base64 32`
+    - **Never change** after initial setup or credentials become unrecoverable
+    - Back up securely in a password manager or secrets vault
+  </Warning>
+</ParamField>
+
+<ParamField path="N8N_USER_FOLDER" type="string" default="~/.n8n">
+  Path to n8n's data folder containing database, settings, and custom extensions.
+  
+  ```bash
+  N8N_USER_FOLDER=/data/n8n
+  ```
+</ParamField>
+
+<ParamField path="N8N_HOST" type="string" default="localhost">
+  Hostname or domain where n8n is accessible.
+  
+  ```bash
+  N8N_HOST=n8n.example.com
+  ```
+</ParamField>
+
+<ParamField path="N8N_PORT" type="number" default="5678">
+  Port for the n8n web server.
+  
+  ```bash
+  N8N_PORT=5678
+  ```
+</ParamField>
+
+<ParamField path="N8N_PROTOCOL" type="string" default="http">
+  Protocol (http or https) used to access n8n.
+  
+  ```bash
+  N8N_PROTOCOL=https
+  ```
+</ParamField>
+
+<ParamField path="WEBHOOK_URL" type="string">
+  Full URL where webhooks can reach n8n. Defaults to `{N8N_PROTOCOL}://{N8N_HOST}/`.
+  
+  ```bash
+  WEBHOOK_URL=https://n8n.example.com/
+  ```
+</ParamField>
+
+### Timezone
+
+<ParamField path="GENERIC_TIMEZONE" type="string" default="America/New_York">
+  Default timezone for n8n workflows (used by Schedule node).
+  
+  ```bash
+  GENERIC_TIMEZONE=Europe/Berlin
+  ```
+</ParamField>
+
+<ParamField path="TZ" type="string">
+  System timezone for the container/process.
+  
+  ```bash
+  TZ=Europe/Berlin
+  ```
+</ParamField>
+
+## Database Configuration
+
+### Database Type
+
+<ParamField path="DB_TYPE" type="string" default="sqlite">
+  Database type: `sqlite` or `postgresdb`.
+  
+  ```bash
+  DB_TYPE=postgresdb
+  ```
+  
+  <Note>
+    PostgreSQL is **required** for:
+    - Queue mode (scaling)
+    - Multi-main setup
+    - Production deployments
+  </Note>
+</ParamField>
+
+### SQLite Configuration
+
+<ParamField path="DB_SQLITE_DATABASE" type="string" default="database.sqlite">
+  SQLite database filename (relative to `N8N_USER_FOLDER`).
+  
+  ```bash
+  DB_SQLITE_DATABASE=n8n.sqlite
+  ```
+</ParamField>
+
+<ParamField path="DB_SQLITE_POOL_SIZE" type="number" default="3">
+  SQLite connection pool size (minimum 1).
+  
+  ```bash
+  DB_SQLITE_POOL_SIZE=5
+  ```
+</ParamField>
+
+<ParamField path="DB_SQLITE_VACUUM_ON_STARTUP" type="boolean" default="false">
+  Run VACUUM on startup to optimize database. **Warning:** Increases startup time.
+  
+  ```bash
+  DB_SQLITE_VACUUM_ON_STARTUP=true
+  ```
+</ParamField>
+
+### PostgreSQL Configuration
+
+<ParamField path="DB_POSTGRESDB_HOST" type="string" default="localhost">
+  PostgreSQL server hostname.
+  
+  ```bash
+  DB_POSTGRESDB_HOST=postgres.example.com
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_PORT" type="number" default="5432">
+  PostgreSQL server port.
+  
+  ```bash
+  DB_POSTGRESDB_PORT=5432
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_DATABASE" type="string" default="n8n">
+  PostgreSQL database name.
+  
+  ```bash
+  DB_POSTGRESDB_DATABASE=n8n
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_USER" type="string" default="postgres">
+  PostgreSQL username.
+  
+  ```bash
+  DB_POSTGRESDB_USER=n8n_user
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_PASSWORD" type="string">
+  PostgreSQL password.
+  
+  ```bash
+  DB_POSTGRESDB_PASSWORD=secure-password
+  ```
+  
+  <Note>
+    Can also use `DB_POSTGRESDB_PASSWORD_FILE` to read from a file (Docker secrets).
+  </Note>
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_SCHEMA" type="string" default="public">
+  PostgreSQL schema name.
+  
+  ```bash
+  DB_POSTGRESDB_SCHEMA=n8n_schema
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_POOL_SIZE" type="number" default="2">
+  PostgreSQL connection pool size.
+  
+  ```bash
+  DB_POSTGRESDB_POOL_SIZE=10
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_CONNECTION_TIMEOUT" type="number" default="20000">
+  Connection timeout in milliseconds.
+  
+  ```bash
+  DB_POSTGRESDB_CONNECTION_TIMEOUT=30000
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_STATEMENT_TIMEOUT" type="number" default="300000">
+  Query execution timeout in milliseconds. Set to 0 to disable.
+  
+  ```bash
+  DB_POSTGRESDB_STATEMENT_TIMEOUT=60000
+  ```
+</ParamField>
+
+### PostgreSQL SSL
+
+<ParamField path="DB_POSTGRESDB_SSL_ENABLED" type="boolean" default="false">
+  Enable SSL/TLS for PostgreSQL connections.
+  
+  ```bash
+  DB_POSTGRESDB_SSL_ENABLED=true
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_SSL_CA" type="string">
+  Path to SSL certificate authority file.
+  
+  ```bash
+  DB_POSTGRESDB_SSL_CA=/path/to/ca.crt
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_SSL_CERT" type="string">
+  Path to SSL client certificate.
+  
+  ```bash
+  DB_POSTGRESDB_SSL_CERT=/path/to/client.crt
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_SSL_KEY" type="string">
+  Path to SSL client key.
+  
+  ```bash
+  DB_POSTGRESDB_SSL_KEY=/path/to/client.key
+  ```
+</ParamField>
+
+<ParamField path="DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED" type="boolean" default="true">
+  Reject unauthorized SSL connections.
+  
+  ```bash
+  DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED=true
+  ```
+</ParamField>
+
+### Database Logging
+
+<ParamField path="DB_LOGGING_ENABLED" type="boolean" default="false">
+  Enable database query logging.
+  
+  ```bash
+  DB_LOGGING_ENABLED=true
+  ```
+</ParamField>
+
+<ParamField path="DB_LOGGING_OPTIONS" type="string" default="error">
+  Logging level: `query`, `error`, `schema`, `warn`, `info`, `log`, or `all`.
+  
+  ```bash
+  DB_LOGGING_OPTIONS=query
+  ```
+</ParamField>
+
+<ParamField path="DB_LOGGING_MAX_EXECUTION_TIME" type="number" default="0">
+  Log only queries exceeding this time (ms). Set to 0 to disable.
+  
+  ```bash
+  DB_LOGGING_MAX_EXECUTION_TIME=1000
+  ```
+</ParamField>
+
+## Queue Mode Configuration
+
+### Execution Mode
+
+<ParamField path="EXECUTIONS_MODE" type="string" default="regular">
+  Execution mode: `regular` (in-process) or `queue` (worker-based).
+  
+  ```bash
+  EXECUTIONS_MODE=queue
+  ```
+  
+  <Note>
+    Queue mode requires PostgreSQL and Redis.
+  </Note>
+</ParamField>
+
+### Redis Configuration
+
+<ParamField path="QUEUE_BULL_REDIS_HOST" type="string" default="localhost">
+  Redis server hostname.
+  
+  ```bash
+  QUEUE_BULL_REDIS_HOST=redis.example.com
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_REDIS_PORT" type="number" default="6379">
+  Redis server port.
+  
+  ```bash
+  QUEUE_BULL_REDIS_PORT=6379
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_REDIS_DB" type="number" default="0">
+  Redis database number.
+  
+  ```bash
+  QUEUE_BULL_REDIS_DB=2
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_REDIS_USERNAME" type="string">
+  Redis username (Redis 6.0+).
+  
+  ```bash
+  QUEUE_BULL_REDIS_USERNAME=n8n_user
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_REDIS_PASSWORD" type="string">
+  Redis password.
+  
+  ```bash
+  QUEUE_BULL_REDIS_PASSWORD=redis-password
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_REDIS_TIMEOUT_THRESHOLD" type="number" default="10000">
+  Max cumulative timeout (ms) for Redis connection retries before exit.
+  
+  ```bash
+  QUEUE_BULL_REDIS_TIMEOUT_THRESHOLD=30000
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_PREFIX" type="string" default="bull">
+  Prefix for Bull queue keys in Redis.
+  
+  ```bash
+  QUEUE_BULL_PREFIX=n8n_queue
+  ```
+</ParamField>
+
+### Redis TLS
+
+<ParamField path="QUEUE_BULL_REDIS_TLS" type="boolean" default="false">
+  Enable TLS for Redis connections.
+  
+  ```bash
+  QUEUE_BULL_REDIS_TLS=true
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_BULL_REDIS_DNS_LOOKUP_STRATEGY" type="string" default="LOOKUP">
+  DNS resolution strategy: `LOOKUP` (use DNS) or `NONE` (pass hostnames directly).
+  
+  ```bash
+  QUEUE_BULL_REDIS_DNS_LOOKUP_STRATEGY=NONE
+  ```
+  
+  <Note>
+    Use `NONE` for AWS ElastiCache with TLS to avoid certificate errors.
+  </Note>
+</ParamField>
+
+### Redis Cluster
+
+<ParamField path="QUEUE_BULL_REDIS_CLUSTER_NODES" type="string">
+  Comma-separated list of Redis cluster nodes as `host:port` pairs.
+  
+  ```bash
+  QUEUE_BULL_REDIS_CLUSTER_NODES=redis-1:6379,redis-2:6379,redis-3:6379
+  ```
+</ParamField>
+
+### Worker Settings
+
+<ParamField path="QUEUE_HEALTH_CHECK_ACTIVE" type="boolean" default="false">
+  Enable health check endpoints for workers.
+  
+  ```bash
+  QUEUE_HEALTH_CHECK_ACTIVE=true
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_HEALTH_CHECK_PORT" type="number" default="5678">
+  Port for worker health check server.
+  
+  ```bash
+  QUEUE_HEALTH_CHECK_PORT=5679
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_WORKER_LOCK_DURATION" type="number" default="60000">
+  Lease duration (ms) for a worker processing a job.
+  
+  ```bash
+  QUEUE_WORKER_LOCK_DURATION=120000
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_WORKER_LOCK_RENEW_TIME" type="number" default="10000">
+  How often (ms) a worker must renew its lease.
+  
+  ```bash
+  QUEUE_WORKER_LOCK_RENEW_TIME=15000
+  ```
+</ParamField>
+
+<ParamField path="QUEUE_WORKER_STALLED_INTERVAL" type="number" default="30000">
+  How often (ms) to check for stalled jobs. Set to 0 to disable.
+  
+  ```bash
+  QUEUE_WORKER_STALLED_INTERVAL=60000
+  ```
+</ParamField>
+
+## Execution Settings
+
+<ParamField path="EXECUTIONS_TIMEOUT" type="number" default="-1">
+  Workflow execution timeout in seconds. `-1` for unlimited.
+  
+  ```bash
+  EXECUTIONS_TIMEOUT=300
+  ```
+</ParamField>
+
+<ParamField path="EXECUTIONS_TIMEOUT_MAX" type="number" default="3600">
+  Maximum allowed execution timeout in seconds.
+  
+  ```bash
+  EXECUTIONS_TIMEOUT_MAX=7200
+  ```
+</ParamField>
+
+<ParamField path="N8N_CONCURRENCY_PRODUCTION_LIMIT" type="number" default="-1">
+  Max concurrent production executions. `-1` for unlimited.
+  
+  ```bash
+  N8N_CONCURRENCY_PRODUCTION_LIMIT=10
+  ```
+</ParamField>
+
+### Execution Data Pruning
+
+<ParamField path="EXECUTIONS_DATA_PRUNE" type="boolean" default="true">
+  Enable automatic deletion of old execution data.
+  
+  ```bash
+  EXECUTIONS_DATA_PRUNE=true
+  ```
+</ParamField>
+
+<ParamField path="EXECUTIONS_DATA_MAX_AGE" type="number" default="336">
+  Age in hours before executions are eligible for soft deletion.
+  
+  ```bash
+  EXECUTIONS_DATA_MAX_AGE=168  # 7 days
+  ```
+</ParamField>
+
+<ParamField path="EXECUTIONS_DATA_PRUNE_MAX_COUNT" type="number" default="10000">
+  Maximum number of executions to keep. `0` for unlimited.
+  
+  ```bash
+  EXECUTIONS_DATA_PRUNE_MAX_COUNT=50000
+  ```
+</ParamField>
+
+<ParamField path="EXECUTIONS_DATA_HARD_DELETE_BUFFER" type="number" default="1">
+  Hours buffer before hard-deleting executions.
+  
+  ```bash
+  EXECUTIONS_DATA_HARD_DELETE_BUFFER=24
+  ```
+</ParamField>
+
+## Task Runner Configuration
+
+<ParamField path="N8N_RUNNERS_MODE" type="string" default="internal">
+  Task runner mode: `internal` (child process) or `external` (separate process).
+  
+  ```bash
+  N8N_RUNNERS_MODE=external
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_BROKER_PORT" type="number" default="5679">
+  Port for task runner broker.
+  
+  ```bash
+  N8N_RUNNERS_BROKER_PORT=5679
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_BROKER_LISTEN_ADDRESS" type="string" default="127.0.0.1">
+  IP address for task runner broker to listen on.
+  
+  ```bash
+  N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_AUTH_TOKEN" type="string">
+  Authentication token for task runners.
+  
+  ```bash
+  N8N_RUNNERS_AUTH_TOKEN=your-secure-runner-token
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_TASK_BROKER_URI" type="string">
+  URI for runners to connect to broker (runner-side config).
+  
+  ```bash
+  N8N_RUNNERS_TASK_BROKER_URI=http://n8n:5679
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_MAX_CONCURRENCY" type="number" default="10">
+  Max concurrent tasks per runner.
+  
+  ```bash
+  N8N_RUNNERS_MAX_CONCURRENCY=20
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_TASK_TIMEOUT" type="number" default="300">
+  Task execution timeout in seconds.
+  
+  ```bash
+  N8N_RUNNERS_TASK_TIMEOUT=600
+  ```
+</ParamField>
+
+<ParamField path="N8N_RUNNERS_MAX_PAYLOAD" type="number" default="1073741824">
+  Maximum payload size in bytes (default 1GB).
+  
+  ```bash
+  N8N_RUNNERS_MAX_PAYLOAD=2147483648  # 2GB
+  ```
+</ParamField>
+
+## Security Configuration
+
+<ParamField path="N8N_RESTRICT_FILE_ACCESS_TO" type="string" default="~/.n8n-files">
+  Directories that ReadWriteFile and ReadBinaryFiles nodes can access. Separate with `;`.
+  
+  ```bash
+  N8N_RESTRICT_FILE_ACCESS_TO=/data/allowed;/mnt/shared
+  ```
+  
+  <Warning>
+    Set to empty string to disable restrictions (insecure for production).
+  </Warning>
+</ParamField>
+
+<ParamField path="N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES" type="boolean" default="true">
+  Block access to n8n's internal directories.
+  
+  ```bash
+  N8N_BLOCK_FILE_ACCESS_TO_N8N_FILES=true
+  ```
+</ParamField>
+
+<ParamField path="NODES_EXCLUDE" type="string" default='["n8n-nodes-base.executeCommand","n8n-nodes-base.localFileTrigger"]'>
+  JSON array of node types to exclude for security.
+  
+  ```bash
+  NODES_EXCLUDE='["n8n-nodes-base.executeCommand"]'
+  ```
+</ParamField>
+
+<ParamField path="NODES_INCLUDE" type="string" default="[]">
+  JSON array of node types to include. Empty means all (except excluded).
+  
+  ```bash
+  NODES_INCLUDE='["n8n-nodes-base.httpRequest","n8n-nodes-base.postgres"]'
+  ```
+</ParamField>
+
+## Multi-Main Setup
+
+<ParamField path="N8N_MULTI_MAIN_SETUP_ENABLED" type="boolean" default="false">
+  Enable multi-main setup for high availability (requires Enterprise license).
+  
+  ```bash
+  N8N_MULTI_MAIN_SETUP_ENABLED=true
+  ```
+</ParamField>
+
+<ParamField path="N8N_MULTI_MAIN_SETUP_KEY_TTL" type="number" default="10">
+  Leader key TTL in seconds.
+  
+  ```bash
+  N8N_MULTI_MAIN_SETUP_KEY_TTL=15
+  ```
+</ParamField>
+
+<ParamField path="N8N_MULTI_MAIN_SETUP_CHECK_INTERVAL" type="number" default="3">
+  Leader check interval in seconds.
+  
+  ```bash
+  N8N_MULTI_MAIN_SETUP_CHECK_INTERVAL=5
+  ```
+</ParamField>
+
+## Monitoring & Metrics
+
+<ParamField path="N8N_METRICS" type="boolean" default="false">
+  Enable Prometheus metrics endpoint at `/metrics`.
+  
+  ```bash
+  N8N_METRICS=true
+  ```
+</ParamField>
+
+<ParamField path="N8N_METRICS_PREFIX" type="string" default="n8n_">
+  Prefix for Prometheus metric names.
+  
+  ```bash
+  N8N_METRICS_PREFIX=workflow_
+  ```
+</ParamField>
+
+<ParamField path="N8N_METRICS_INCLUDE_DEFAULT_METRICS" type="boolean" default="true">
+  Include Node.js and system metrics.
+  
+  ```bash
+  N8N_METRICS_INCLUDE_DEFAULT_METRICS=true
+  ```
+</ParamField>
+
+<ParamField path="N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL" type="boolean" default="false">
+  Include workflow ID label on metrics (increases cardinality).
+  
+  ```bash
+  N8N_METRICS_INCLUDE_WORKFLOW_ID_LABEL=true
+  ```
+</ParamField>
+
+## User Management
+
+<ParamField path="N8N_USER_MANAGEMENT_JWT_SECRET" type="string">
+  JWT secret for session tokens. Auto-generated if not set.
+  
+  ```bash
+  N8N_USER_MANAGEMENT_JWT_SECRET=your-jwt-secret
+  ```
+</ParamField>
+
+<ParamField path="N8N_USER_MANAGEMENT_JWT_DURATION_HOURS" type="number" default="168">
+  JWT session duration in hours (default 7 days).
+  
+  ```bash
+  N8N_USER_MANAGEMENT_JWT_DURATION_HOURS=24
+  ```
+</ParamField>
+
+## Email Configuration
+
+<ParamField path="N8N_EMAIL_MODE" type="string" default="smtp">
+  Email sending mode: `smtp` or empty to disable.
+  
+  ```bash
+  N8N_EMAIL_MODE=smtp
+  ```
+</ParamField>
+
+<ParamField path="N8N_SMTP_HOST" type="string">
+  SMTP server hostname.
+  
+  ```bash
+  N8N_SMTP_HOST=smtp.gmail.com
+  ```
+</ParamField>
+
+<ParamField path="N8N_SMTP_PORT" type="number" default="465">
+  SMTP server port.
+  
+  ```bash
+  N8N_SMTP_PORT=587
+  ```
+</ParamField>
+
+<ParamField path="N8N_SMTP_USER" type="string">
+  SMTP username.
+  
+  ```bash
+  N8N_SMTP_USER=notifications@example.com
+  ```
+</ParamField>
+
+<ParamField path="N8N_SMTP_PASS" type="string">
+  SMTP password.
+  
+  ```bash
+  N8N_SMTP_PASS=smtp-password
+  ```
+</ParamField>
+
+<ParamField path="N8N_SMTP_SSL" type="boolean" default="true">
+  Use SSL for SMTP.
+  
+  ```bash
+  N8N_SMTP_SSL=false
+  ```
+</ParamField>
+
+<ParamField path="N8N_SMTP_SENDER" type="string">
+  Sender name and email.
+  
+  ```bash
+  N8N_SMTP_SENDER=n8n <notifications@example.com>
+  ```
+</ParamField>
+
+## Public API
+
+<ParamField path="N8N_PUBLIC_API_DISABLED" type="boolean" default="false">
+  Disable the Public API.
+  
+  ```bash
+  N8N_PUBLIC_API_DISABLED=false
+  ```
+</ParamField>
+
+<ParamField path="N8N_PUBLIC_API_ENDPOINT" type="string" default="api">
+  Path segment for Public API.
+  
+  ```bash
+  N8N_PUBLIC_API_ENDPOINT=public-api
+  ```
+</ParamField>
+
+## Endpoints
+
+<ParamField path="N8N_ENDPOINT_WEBHOOK" type="string" default="webhook">
+  Path segment for webhook endpoints.
+  
+  ```bash
+  N8N_ENDPOINT_WEBHOOK=hooks
+  ```
+</ParamField>
+
+<ParamField path="N8N_ENDPOINT_REST" type="string" default="rest">
+  Path segment for REST API.
+  
+  ```bash
+  N8N_ENDPOINT_REST=api
+  ```
+</ParamField>
+
+<ParamField path="N8N_ENDPOINT_HEALTH" type="string" default="/healthz">
+  Health check endpoint path.
+  
+  ```bash
+  N8N_ENDPOINT_HEALTH=/health
+  ```
+</ParamField>
+
+<ParamField path="N8N_DISABLE_UI" type="boolean" default="false">
+  Disable the web UI (API-only mode).
+  
+  ```bash
+  N8N_DISABLE_UI=false
+  ```
+</ParamField>
+
+## Configuration Examples
+
+<Tabs>
+  <Tab title="Development">
+    ```bash
+    # Basic development setup with SQLite
+    DB_TYPE=sqlite
+    N8N_ENCRYPTION_KEY=test-encryption-key
+    N8N_HOST=localhost
+    N8N_PORT=5678
+    N8N_PROTOCOL=http
+    GENERIC_TIMEZONE=America/New_York
+    ```
+  </Tab>
+  
+  <Tab title="Production Single Instance">
+    ```bash
+    # Production with PostgreSQL
+    DB_TYPE=postgresdb
+    DB_POSTGRESDB_HOST=postgres.internal
+    DB_POSTGRESDB_DATABASE=n8n_prod
+    DB_POSTGRESDB_USER=n8n_user
+    DB_POSTGRESDB_PASSWORD=secure-password
+    DB_POSTGRESDB_SSL_ENABLED=true
+    
+    N8N_ENCRYPTION_KEY=production-encryption-key-32-chars
+    N8N_HOST=workflows.company.com
+    N8N_PROTOCOL=https
+    WEBHOOK_URL=https://workflows.company.com/
+    
+    # Security
+    NODES_EXCLUDE='["n8n-nodes-base.executeCommand","n8n-nodes-base.localFileTrigger"]'
+    N8N_RESTRICT_FILE_ACCESS_TO=/data/workflows
+    
+    # Monitoring
+    N8N_METRICS=true
+    ```
+  </Tab>
+  
+  <Tab title="Queue Mode">
+    ```bash
+    # Queue mode with workers
+    DB_TYPE=postgresdb
+    DB_POSTGRESDB_HOST=postgres.internal
+    DB_POSTGRESDB_DATABASE=n8n_prod
+    DB_POSTGRESDB_USER=n8n_user
+    DB_POSTGRESDB_PASSWORD=secure-password
+    
+    N8N_ENCRYPTION_KEY=production-encryption-key-32-chars
+    
+    # Queue configuration
+    EXECUTIONS_MODE=queue
+    QUEUE_BULL_REDIS_HOST=redis.internal
+    QUEUE_BULL_REDIS_PORT=6379
+    QUEUE_BULL_REDIS_PASSWORD=redis-password
+    QUEUE_BULL_REDIS_TLS=true
+    QUEUE_HEALTH_CHECK_ACTIVE=true
+    
+    # Worker settings (for worker processes)
+    N8N_CONCURRENCY_PRODUCTION_LIMIT=10
+    
+    # Monitoring
+    N8N_METRICS=true
+    ```
+  </Tab>
+  
+  <Tab title="With External Runners">
+    ```bash
+    # n8n main process
+    N8N_RUNNERS_MODE=external
+    N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+    N8N_RUNNERS_BROKER_PORT=5679
+    N8N_RUNNERS_AUTH_TOKEN=secure-runner-token
+    N8N_RUNNERS_MAX_CONCURRENCY=20
+    N8N_RUNNERS_TASK_TIMEOUT=600
+    
+    # Runner process (separate container/process)
+    N8N_RUNNERS_TASK_BROKER_URI=http://n8n-main:5679
+    N8N_RUNNERS_AUTH_TOKEN=secure-runner-token
+    ```
+  </Tab>
+</Tabs>
+
+## Environment Variable Files
+
+For Docker secrets and Kubernetes:
+
+```bash
+# These variables support _FILE suffix
+DB_POSTGRESDB_PASSWORD_FILE=/run/secrets/db_password
+N8N_ENCRYPTION_KEY_FILE=/run/secrets/encryption_key
+```
+
+<Note>
+  When using `_FILE` variants, n8n reads the value from the specified file path instead of the environment variable directly.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Deployment" icon="docker" href="/hosting/docker">
+    See these configurations in Docker Compose examples
+  </Card>
+  <Card title="Scaling" icon="expand" href="/hosting/scaling">
+    Learn about queue mode and scaling strategies
+  </Card>
+</CardGroup>

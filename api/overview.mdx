@@ -1,0 +1,232 @@
+---
+title: "API Overview"
+description: "Learn about n8n's REST API and how to interact with workflows, executions, and credentials programmatically"
+---
+
+## Introduction
+
+n8n provides a comprehensive REST API that allows you to programmatically manage workflows, executions, credentials, and other resources. The API is designed to be intuitive and follows RESTful principles.
+
+## Base URL
+
+The API is accessible at your n8n instance URL:
+
+```
+https://your-n8n-instance.com/api/v1
+```
+
+## API Versions
+
+n8n currently supports:
+
+- **Public API (v1)**: `/api/v1/*` - Designed for external integrations
+- **Internal API**: Used by the n8n frontend application
+
+<Note>
+This documentation focuses on the Public API endpoints that are stable and recommended for external use.
+</Note>
+
+## Core Resources
+
+The n8n API provides access to these core resources:
+
+### Workflows
+Create, read, update, and delete workflows. Activate and deactivate workflow automation.
+
+```
+POST   /api/v1/workflows          # Create workflow
+GET    /api/v1/workflows          # List workflows
+GET    /api/v1/workflows/:id      # Get workflow
+PATCH  /api/v1/workflows/:id      # Update workflow
+DELETE /api/v1/workflows/:id      # Delete workflow
+```
+
+[Learn more about Workflows API →](/api/workflows)
+
+### Executions
+Monitor workflow executions, check their status, and manage running workflows.
+
+```
+GET    /api/v1/executions         # List executions
+GET    /api/v1/executions/:id     # Get execution
+POST   /api/v1/executions/:id/retry   # Retry execution
+POST   /api/v1/executions/:id/stop    # Stop execution
+```
+
+[Learn more about Executions API →](/api/executions)
+
+### Credentials
+Manage credentials used by workflow nodes for authentication.
+
+```
+POST   /api/v1/credentials        # Create credential
+GET    /api/v1/credentials        # List credentials
+GET    /api/v1/credentials/:id    # Get credential
+PATCH  /api/v1/credentials/:id    # Update credential
+DELETE /api/v1/credentials/:id    # Delete credential
+```
+
+[Learn more about Credentials API →](/api/credentials)
+
+## API Features
+
+### Pagination
+
+List endpoints support cursor-based pagination:
+
+```json
+{
+  "data": [...],
+  "nextCursor": "eyJsYXN0SWQiOiIxMjM0NSIsImxpbWl0IjoxMDB9"
+}
+```
+
+Use the `nextCursor` value in subsequent requests:
+
+```bash
+GET /api/v1/workflows?cursor=eyJsYXN0SWQiOiIxMjM0NSIsImxpbWl0IjoxMDB9
+```
+
+### Filtering
+
+Many endpoints support filtering by various parameters:
+
+```bash
+# Filter workflows by name
+GET /api/v1/workflows?name=customer
+
+# Filter by active status
+GET /api/v1/workflows?active=true
+
+# Filter by project
+GET /api/v1/workflows?projectId=abc123
+```
+
+### Response Format
+
+All API responses use JSON format:
+
+```json
+{
+  "id": "workflow123",
+  "name": "My Workflow",
+  "active": true,
+  "nodes": [...],
+  "connections": {...}
+}
+```
+
+## Error Handling
+
+The API uses standard HTTP status codes:
+
+| Status Code | Description |
+|------------|-------------|
+| `200` | Success |
+| `201` | Resource created |
+| `400` | Bad request - Invalid parameters |
+| `401` | Unauthorized - Invalid or missing API key |
+| `403` | Forbidden - Insufficient permissions |
+| `404` | Resource not found |
+| `409` | Conflict - Resource state conflict |
+| `500` | Internal server error |
+
+### Error Response Format
+
+```json
+{
+  "message": "Workflow with ID \"workflow123\" does not exist",
+  "code": "NOT_FOUND"
+}
+```
+
+## Rate Limiting
+
+n8n implements rate limiting to ensure fair usage:
+
+- **IP-based limits**: 1000 requests per 5 minutes
+- **Key-based limits**: Varies by endpoint and operation
+
+<Warning>
+Exceeding rate limits returns a `429 Too Many Requests` status code.
+</Warning>
+
+## Scopes and Permissions
+
+API keys can have specific scopes that control access:
+
+- `workflow:read` - Read workflow data
+- `workflow:create` - Create new workflows
+- `workflow:update` - Update existing workflows
+- `workflow:delete` - Delete workflows
+- `workflow:execute` - Execute workflows
+- `credential:read` - Read credentials
+- `credential:create` - Create credentials
+- `credential:update` - Update credentials
+- `credential:delete` - Delete credentials
+- `execution:read` - Read execution data
+- `execution:list` - List executions
+
+[Learn more about API Authentication →](/api/authentication)
+
+## Getting Started
+
+<Steps>
+  <Step title="Generate an API Key">
+    Navigate to Settings → API in your n8n instance and create a new API key with the required scopes.
+  </Step>
+  
+  <Step title="Make Your First Request">
+    Use the API key to authenticate your requests:
+    
+    ```bash
+    curl -H "X-N8N-API-KEY: your-api-key" \
+      https://your-n8n-instance.com/api/v1/workflows
+    ```
+  </Step>
+  
+  <Step title="Explore the API">
+    Browse the documentation for specific endpoints and try different operations.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Appropriate Scopes">
+    Only grant the minimum required scopes to your API keys. This follows the principle of least privilege and enhances security.
+  </Accordion>
+  
+  <Accordion title="Handle Errors Gracefully">
+    Always check HTTP status codes and handle errors appropriately in your application.
+  </Accordion>
+  
+  <Accordion title="Implement Retry Logic">
+    For transient errors (5xx), implement exponential backoff retry logic.
+  </Accordion>
+  
+  <Accordion title="Cache When Possible">
+    Cache workflow and credential data when appropriate to reduce API calls.
+  </Accordion>
+  
+  <Accordion title="Use Webhooks">
+    For real-time updates, consider using n8n's webhook functionality instead of polling.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate API requests
+  </Card>
+  <Card title="Workflows" icon="diagram-project" href="/api/workflows">
+    Manage workflows via API
+  </Card>
+  <Card title="Executions" icon="play" href="/api/executions">
+    Monitor and control workflow executions
+  </Card>
+  <Card title="Credentials" icon="lock" href="/api/credentials">
+    Manage credentials programmatically
+  </Card>
+</CardGroup>

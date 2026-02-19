@@ -1,80 +1,215 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get n8n running and create your first workflow in under 5 minutes
 ---
 
-## Get started in three steps
+# Quickstart
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Get n8n up and running in minutes and create your first workflow. This guide will help you:
+- Install n8n locally
+- Create your first workflow
+- Understand the n8n interface
+- Test and execute your workflow
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+This quickstart uses `npx` for the fastest setup. For production deployments, see the [Installation Guide](/installation).
 </Note>
+
+## Step 1: Install and Start n8n
+
+The fastest way to try n8n is with npx (requires Node.js 22.16+):
+
+<CodeGroup>
+```bash npx
+npx n8n
+```
+
+```bash Docker
+docker volume create n8n_data
+docker run -it --rm --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n
+```
+</CodeGroup>
+
+Once n8n starts, open your browser to [http://localhost:5678](http://localhost:5678). You'll be prompted to create an owner account.
+
+## Step 2: Create Your First Workflow
+
+Let's create a simple workflow that fetches data from an API and processes it.
+
+<Steps>
+<Step title="Add a Manual Trigger">
+  1. Click the **+** button in the canvas
+  2. Search for "Manual Trigger"
+  3. Click to add it to your workflow
+
+  The Manual Trigger lets you start workflows manually for testing.
+</Step>
+
+<Step title="Add an HTTP Request Node">
+  1. Click the **+** button again
+  2. Search for "HTTP Request"
+  3. Configure it:
+     - Method: `GET`
+     - URL: `https://jsonplaceholder.typicode.com/users`
+  
+  This will fetch a list of users from a test API.
+</Step>
+
+<Step title="Add a Code Node">
+  1. Add another node
+  2. Search for "Code"
+  3. Use this JavaScript to transform the data:
+
+  ```javascript
+  // Transform user data
+  return items.map(item => ({
+    json: {
+      name: item.json.name,
+      email: item.json.email,
+      company: item.json.company.name,
+      city: item.json.address.city
+    }
+  }));
+  ```
+</Step>
+
+<Step title="Test Your Workflow">
+  1. Click **Test workflow** button in the top right
+  2. Your workflow will execute
+  3. Click each node to see the data flowing through
+</Step>
+</Steps>
+
+## Understanding the Interface
+
+<Tabs>
+<Tab title="Canvas">
+  The main area where you build workflows by connecting nodes. Click and drag to move nodes, click the connector dots to link them together.
+</Tab>
+
+<Tab title="Node Panel">
+  The left sidebar contains all available nodes:
+  - **Triggers**: Start workflows (Schedule, Webhook, etc.)
+  - **Actions**: Perform operations (HTTP Request, Database, etc.)
+  - **Flow**: Control workflow logic (If, Switch, Merge)
+  - **Data**: Transform data (Code, Set, Filter)
+</Tab>
+
+<Tab title="Execution Details">
+  The right panel shows execution data:
+  - **Input/Output**: Data flowing into and out of each node
+  - **JSON/Table views**: Different ways to visualize data
+  - **Binary data**: File attachments and images
+</Tab>
+</Tabs>
+
+## Common Workflow Patterns
+
+<CardGroup cols={2}>
+  <Card title="Schedule + Action" icon="clock">
+    Use a Schedule Trigger to run workflows automatically (e.g., daily reports, data sync)
+  </Card>
+  <Card title="Webhook + Process" icon="webhook">
+    Receive data from external services and process it in real-time
+  </Card>
+  <Card title="Poll + Notify" icon="bell">
+    Check for new data periodically and send notifications
+  </Card>
+  <Card title="Manual + Test" icon="play">
+    Test complex workflows manually before automating them
+  </Card>
+</CardGroup>
+
+## Data Flow
+
+In n8n, data flows from node to node as **items**. Each item has:
+- `json`: The main data object
+- `binary` (optional): File attachments
+
+```json
+{
+  "json": {
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "binary": {}
+}
+```
+
+Access data in expressions using `$json`:
+```javascript
+{{ $json.name }}         // John Doe
+{{ $json.email }}        // john@example.com
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/core-concepts">
+    Learn about nodes, triggers, credentials, and more
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up n8n for production use
+  </Card>
+  <Card title="Building Workflows" icon="diagram-project" href="/workflows/creating-workflows">
+    Deep dive into workflow creation
+  </Card>
+  <Card title="AI Workflows" icon="brain" href="/ai/overview">
+    Build AI-powered automations with LangChain
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="n8n won't start">
+  Check that:
+  - Node.js version is 22.16 or higher: `node --version`
+  - Port 5678 is not in use
+  - You have permissions to write to the `.n8n` folder
+</Accordion>
+
+<Accordion title="Workflow won't execute">
+  Common issues:
+  - Check that nodes are properly connected
+  - Verify API credentials are configured
+  - Look for error messages in node output
+  - Check browser console for errors
+</Accordion>
+
+<Accordion title="Data not appearing">
+  - Click **Test workflow** to execute manually
+  - Check that previous nodes ran successfully
+  - Verify expressions using the Expression Editor
+  - Use `console.log()` in Code nodes for debugging
+</Accordion>
+</AccordionGroup>
+
+## Database Configuration
+
+By default, n8n uses SQLite for storage. For production use, consider PostgreSQL:
+
+```bash
+# With environment variables
+export DB_TYPE=postgresdb
+export DB_POSTGRESDB_HOST=localhost
+export DB_POSTGRESDB_PORT=5432
+export DB_POSTGRESDB_DATABASE=n8n
+export DB_POSTGRESDB_USER=n8n
+export DB_POSTGRESDB_PASSWORD=password
+
+npx n8n
+```
+
+See the [Installation Guide](/installation) for complete database configuration.
+
+## Additional Resources
+
+- [n8n Community Forum](https://community.n8n.io) - Get help and share workflows
+- [Workflow Templates](https://n8n.io/workflows) - 900+ ready-to-use templates
+- [Node Documentation](https://docs.n8n.io/integrations/) - Detailed node guides
+- [YouTube Channel](https://www.youtube.com/c/n8n-io) - Video tutorials
+
+<Tip>
+Join the [n8n community forum](https://community.n8n.io) to connect with other users, share workflows, and get help from the team!
+</Tip>

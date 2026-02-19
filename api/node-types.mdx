@@ -1,0 +1,559 @@
+---
+title: Node Types
+description: Complete guide to implementing n8n node types and their interfaces
+---
+
+# Node Types
+
+This guide covers the core interfaces and patterns for implementing n8n nodes.
+
+## INodeType Interface
+
+Every n8n node implements the `INodeType` interface, which defines the node's structure and behavior.
+
+<ParamField path="description" type="INodeTypeDescription" required>
+  Node metadata, UI configuration, and parameter definitions
+</ParamField>
+
+<ParamField path="execute" type="function">
+  Main execution function for programmatic nodes
+  
+  ```typescript
+  execute?(this: IExecuteFunctions): Promise<NodeOutput>
+  ```
+</ParamField>
+
+<ParamField path="poll" type="function">
+  Polling function for trigger nodes with `polling: true`
+  
+  ```typescript
+  poll?(this: IPollFunctions): Promise<INodeExecutionData[][] | null>
+  ```
+</ParamField>
+
+<ParamField path="trigger" type="function">
+  Generic trigger function for event-based triggers
+  
+  ```typescript
+  trigger?(this: ITriggerFunctions): Promise<ITriggerResponse | undefined>
+  ```
+</ParamField>
+
+<ParamField path="webhook" type="function">
+  Webhook handler for webhook-based triggers
+  
+  ```typescript
+  webhook?(this: IWebhookFunctions): Promise<IWebhookResponseData>
+  ```
+</ParamField>
+
+<ParamField path="methods" type="object">
+  Optional methods for dynamic options, credential testing, and resource mapping
+  
+  - `loadOptions`: Dynamic parameter options
+  - `listSearch`: Searchable list options
+  - `credentialTest`: Credential validation
+  - `resourceMapping`: Resource field mapping
+  - `actionHandler`: Custom button actions
+</ParamField>
+
+<ParamField path="webhookMethods" type="object">
+  Webhook lifecycle methods (checkExists, create, delete)
+</ParamField>
+
+## INodeTypeDescription
+
+The description object defines all node metadata and UI configuration.
+
+<CodeGroup>
+```typescript Basic Node Description
+export const versionDescription: INodeTypeDescription = {
+  displayName: 'Edit Fields (Set)',
+  name: 'set',
+  icon: 'fa:pen',
+  iconColor: 'blue',
+  group: ['input'],
+  version: [3, 3.1, 3.2, 3.3, 3.4],
+  description: 'Modify, add, or remove item fields',
+  subtitle: '={{$parameter["mode"]}}',
+  defaults: {
+    name: 'Edit Fields',
+  },
+  inputs: [NodeConnectionTypes.Main],
+  outputs: [NodeConnectionTypes.Main],
+  properties: [
+    // Parameter definitions...
+  ],
+};
+```
+
+```typescript AI Node with Connections
+{
+  displayName: 'OpenAI Chat Model',
+  name: 'openAiChatModel',
+  icon: 'file:openai.svg',
+  group: ['transform'],
+  version: 1,
+  description: 'Use OpenAI chat models',
+  defaults: {
+    name: 'OpenAI Chat Model',
+  },
+  inputs: [],
+  outputs: [NodeConnectionTypes.AiLanguageModel],
+  credentials: [
+    {
+      name: 'openAiApi',
+      required: true,
+    },
+  ],
+  properties: [
+    // Model configuration...
+  ],
+}
+```
+</CodeGroup>
+
+### Core Properties
+
+<ResponseField name="displayName" type="string" required>
+  Human-readable name shown in the UI
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Internal identifier (kebab-case)
+</ResponseField>
+
+<ResponseField name="icon" type="Icon">
+  Node icon. Can be:
+  - `fa:icon-name` - FontAwesome icon
+  - `file:icon.svg` - Custom SVG file
+  - `node:package.nodeName` - Icon from another node
+</ResponseField>
+
+<ResponseField name="iconColor" type="ThemeIconColor">
+  Icon color from design system: `gray`, `blue`, `green`, `red`, `orange`, `purple`, etc.
+</ResponseField>
+
+<ResponseField name="group" type="NodeGroupType[]" required>
+  Node categories: `input`, `output`, `transform`, `trigger`, `schedule`
+</ResponseField>
+
+<ResponseField name="version" type="number | number[]" required>
+  Node version(s). Use array for light versioning: `[1, 2, 3]`
+</ResponseField>
+
+<ResponseField name="inputs" type="Array<NodeConnectionType | INodeInputConfiguration>" required>
+  Input connections. Common types:
+  - `NodeConnectionTypes.Main` - Standard data flow
+  - `NodeConnectionTypes.AiLanguageModel` - AI model input
+  - `NodeConnectionTypes.AiMemory` - AI memory input
+</ResponseField>
+
+<ResponseField name="outputs" type="Array<NodeConnectionType | INodeOutputConfiguration>" required>
+  Output connections. Same types as inputs.
+</ResponseField>
+
+<ResponseField name="properties" type="INodeProperties[]" required>
+  Node parameters definition (see Node Parameters guide)
+</ResponseField>
+
+<ResponseField name="credentials" type="INodeCredentialDescription[]">
+  Required credentials for the node
+</ResponseField>
+
+### Advanced Properties
+
+<ResponseField name="polling" type="boolean">
+  Set to `true` for polling trigger nodes
+</ResponseField>
+
+<ResponseField name="webhooks" type="IWebhookDescription[]">
+  Webhook configuration for webhook triggers
+</ResponseField>
+
+<ResponseField name="requestDefaults" type="HttpRequestOptions">
+  Default HTTP request options for declarative nodes
+</ResponseField>
+
+<ResponseField name="maxNodes" type="number">
+  Maximum instances of this node allowed in a workflow
+</ResponseField>
+
+<ResponseField name="hooks" type="object">
+  Lifecycle hooks: `activate`, `deactivate`
+</ResponseField>
+
+<ResponseField name="features" type="NodeFeaturesDefinition">
+  Feature flags with version-based conditions
+</ResponseField>
+
+## Node Types
+
+### Programmatic Nodes
+
+Nodes with custom execution logic implement the `execute` method.
+
+```typescript packages/nodes-base/nodes/Set/v2/SetV2.node.ts
+export class SetV2 implements INodeType {
+  description: INodeTypeDescription = versionDescription;
+
+  async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    const items = this.getInputData();
+    const returnData: INodeExecutionData[] = [];
+
+    const mode = this.getNodeParameter('mode', 0) as Mode;
+
+    if (mode === 'manual') {
+      // Process each item manually
+      for (let i = 0; i < items.length; i++) {
+        const options = this.getNodeParameter('options', i, {}) as SetNodeOptions;
+        const fields = this.getNodeParameter('fields', i, []) as SetField[];
+        
+        const newItem = await manual.execute.call(
+          this,
+          items[i],
+          i,
+          options,
+          fields,
+        );
+        returnData.push(newItem);
+      }
+    }
+
+    return [returnData];
+  }
+}
+```
+
+### Declarative Nodes
+
+Declarative nodes use `requestDefaults` and routing configuration instead of implementing `execute`.
+
+```typescript Example Declarative Node
+{
+  displayName: 'HTTP Request',
+  name: 'httpRequest',
+  requestDefaults: {
+    baseURL: '={{$credentials.domain}}',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+  },
+  properties: [
+    {
+      displayName: 'Resource',
+      name: 'resource',
+      type: 'options',
+      options: [
+        { name: 'User', value: 'user' },
+        { name: 'Project', value: 'project' },
+      ],
+      default: 'user',
+      noDataExpression: true,
+    },
+    {
+      displayName: 'Operation',
+      name: 'operation',
+      type: 'options',
+      displayOptions: {
+        show: { resource: ['user'] },
+      },
+      options: [
+        {
+          name: 'Get',
+          value: 'get',
+          routing: {
+            request: {
+              method: 'GET',
+              url: '/users/={{$parameter.userId}}',
+            },
+          },
+        },
+      ],
+      default: 'get',
+    },
+  ],
+}
+```
+
+### Trigger Nodes
+
+#### Webhook Triggers
+
+```typescript Webhook Trigger Implementation
+export class WebhookTrigger implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'Webhook Trigger',
+    name: 'webhookTrigger',
+    group: ['trigger'],
+    version: 1,
+    description: 'Starts workflow on webhook event',
+    defaults: { name: 'Webhook Trigger' },
+    inputs: [],
+    outputs: [NodeConnectionTypes.Main],
+    webhooks: [
+      {
+        name: 'default',
+        httpMethod: 'POST',
+        responseMode: 'onReceived',
+        path: 'webhook',
+      },
+    ],
+    properties: [],
+  };
+
+  async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+    const bodyData = this.getBodyData();
+    const headerData = this.getHeaderData();
+
+    return {
+      workflowData: [
+        [
+          {
+            json: {
+              body: bodyData,
+              headers: headerData,
+            },
+          },
+        ],
+      ],
+    };
+  }
+
+  webhookMethods = {
+    default: {
+      async checkExists(this: IHookFunctions): Promise<boolean> {
+        // Check if webhook exists on external service
+        return true;
+      },
+      async create(this: IHookFunctions): Promise<boolean> {
+        // Create webhook on external service
+        return true;
+      },
+      async delete(this: IHookFunctions): Promise<boolean> {
+        // Delete webhook from external service
+        return true;
+      },
+    },
+  };
+}
+```
+
+#### Polling Triggers
+
+```typescript Polling Trigger Implementation
+export class PollingTrigger implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: 'Polling Trigger',
+    name: 'pollingTrigger',
+    group: ['trigger'],
+    version: 1,
+    description: 'Polls for new data',
+    polling: true,
+    defaults: { name: 'Polling Trigger' },
+    inputs: [],
+    outputs: [NodeConnectionTypes.Main],
+    properties: [
+      {
+        displayName: 'Polling Interval',
+        name: 'pollInterval',
+        type: 'number',
+        default: 60,
+        description: 'How often to check for new data (seconds)',
+      },
+    ],
+  };
+
+  async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+    const staticData = this.getWorkflowStaticData('node');
+    let lastId = staticData.lastId as number | undefined;
+
+    // Fetch new items since lastId
+    const newItems = await this.helpers.httpRequest({
+      method: 'GET',
+      url: `https://api.example.com/items?since=${lastId || 0}`,
+    });
+
+    if (newItems.length === 0) {
+      return null;
+    }
+
+    // Update state
+    staticData.lastId = newItems[newItems.length - 1].id;
+
+    return [
+      newItems.map((item: any) => ({
+        json: item,
+      })),
+    ];
+  }
+}
+```
+
+## Versioned Nodes
+
+For major changes, use the `VersionedNodeType` class.
+
+```typescript packages/nodes-base/nodes/Set/Set.node.ts
+import { VersionedNodeType } from 'n8n-workflow';
+import { SetV1 } from './v1/SetV1.node';
+import { SetV2 } from './v2/SetV2.node';
+
+export class Set extends VersionedNodeType {
+  constructor() {
+    const baseDescription: INodeTypeBaseDescription = {
+      displayName: 'Set',
+      name: 'set',
+      icon: 'fa:pen',
+      group: ['input'],
+      description: 'Add or edit fields on an input item',
+      defaultVersion: 3.4,
+    };
+
+    const nodeVersions: IVersionedNodeType['nodeVersions'] = {
+      1: new SetV1(baseDescription),
+      2: new SetV1(baseDescription),
+      3: new SetV2(baseDescription),
+      3.1: new SetV2(baseDescription),
+      3.2: new SetV2(baseDescription),
+      3.3: new SetV2(baseDescription),
+      3.4: new SetV2(baseDescription),
+    };
+
+    super(nodeVersions, baseDescription);
+  }
+}
+```
+
+## Dynamic Methods
+
+Nodes can implement dynamic behavior through the `methods` object.
+
+### Load Options
+
+Provide dynamic dropdown options:
+
+```typescript Load Options Method
+methods = {
+  loadOptions: {
+    async getUsers(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+      const credentials = await this.getCredentials('myApi');
+      const users = await this.helpers.httpRequest({
+        method: 'GET',
+        url: `${credentials.baseUrl}/users`,
+      });
+
+      return users.map((user: any) => ({
+        name: user.name,
+        value: user.id,
+      }));
+    },
+  },
+};
+```
+
+### List Search
+
+Searchable resource lists:
+
+```typescript List Search Method
+methods = {
+  listSearch: {
+    async searchUsers(
+      this: ILoadOptionsFunctions,
+      filter?: string,
+    ): Promise<INodeListSearchResult> {
+      const credentials = await this.getCredentials('myApi');
+      const response = await this.helpers.httpRequest({
+        method: 'GET',
+        url: `${credentials.baseUrl}/users/search`,
+        qs: { q: filter },
+      });
+
+      return {
+        results: response.users.map((user: any) => ({
+          name: user.name,
+          value: user.id,
+          url: user.profileUrl,
+        })),
+      };
+    },
+  },
+};
+```
+
+### Credential Test
+
+Validate credentials:
+
+```typescript Credential Test
+methods = {
+  credentialTest: {
+    async testApiCredentials(
+      this: ICredentialTestFunctions,
+      credential: ICredentialsDecrypted,
+    ): Promise<INodeCredentialTestResult> {
+      const credentials = credential.data as IDataObject;
+      
+      try {
+        await this.helpers.request({
+          method: 'GET',
+          url: `${credentials.baseUrl}/auth/verify`,
+          headers: {
+            'Authorization': `Bearer ${credentials.apiKey}`,
+          },
+        });
+        
+        return {
+          status: 'OK',
+          message: 'Authentication successful',
+        };
+      } catch (error) {
+        return {
+          status: 'Error',
+          message: 'Invalid credentials',
+        };
+      }
+    },
+  },
+};
+```
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Structure">
+    - Use clear, descriptive `displayName` values
+    - Set appropriate `group` for node categorization  
+    - Provide meaningful `description` and `subtitle`
+    - Use semantic versioning for `version`
+  </Tab>
+  
+  <Tab title="Type Safety">
+    - Never use `any` type - use proper interfaces or `unknown`
+    - Avoid type casting with `as` except in tests
+    - Define interfaces for all API responses
+    - Use type guards for runtime validation
+  </Tab>
+  
+  <Tab title="Error Handling">
+    - Use `NodeOperationError` for user-facing errors
+    - Use `NodeApiError` for API-related errors
+    - Provide helpful error messages
+    - Support `continueOnFail` option when appropriate
+  </Tab>
+  
+  <Tab title="Performance">
+    - Use `getWorkflowStaticData()` for persistent state
+    - Implement pagination for large datasets
+    - Cache expensive operations when possible
+    - Use streaming for large file operations
+  </Tab>
+</Tabs>
+
+## See Also
+
+- [Node Execution](/api/node-execution) - Execution contexts and helpers
+- [Node Parameters](/api/node-parameters) - Parameter types and configuration
+- [Credentials](/node-development/credentials) - Credential implementation

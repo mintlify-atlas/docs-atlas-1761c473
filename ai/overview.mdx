@@ -1,0 +1,218 @@
+---
+title: AI Workflows Overview
+description: Learn how to build powerful AI-powered workflows in n8n using LangChain nodes, agents, and vector stores
+---
+
+# AI Workflows in n8n
+
+n8n provides a comprehensive suite of AI nodes built on top of LangChain, enabling you to create sophisticated AI-powered automation workflows. From simple LLM chains to complex autonomous agents with memory and tool use, n8n makes it easy to integrate AI capabilities into your workflows.
+
+## What You Can Build
+
+With n8n's AI nodes, you can build:
+
+<CardGroup cols={2}>
+  <Card title="AI Agents" icon="robot" href="/ai/agents">
+    Autonomous agents that can use tools, make decisions, and interact with your workflows
+  </Card>
+  <Card title="RAG Pipelines" icon="database">
+    Retrieval Augmented Generation systems that combine vector stores with LLMs for context-aware responses
+  </Card>
+  <Card title="Document Processing" icon="file-text">
+    Extract, analyze, and summarize information from documents using AI
+  </Card>
+  <Card title="Conversational AI" icon="message-circle">
+    Build chatbots and conversational interfaces with memory and context
+  </Card>
+</CardGroup>
+
+## Core AI Components
+
+### Language Models
+
+Connect to various LLM providers to power your AI workflows:
+
+- **OpenAI**: GPT-4, GPT-3.5-turbo, and other OpenAI models
+- **Anthropic**: Claude models for advanced reasoning
+- **Google**: Gemini and Vertex AI models
+- **Open Source**: Ollama, Hugging Face, and more
+- **Others**: Cohere, Groq, Mistral, DeepSeek, and many more
+
+### Chains
+
+Chains are pre-built workflows for common AI tasks:
+
+- **Basic LLM Chain**: Simple prompting with structured output
+- **Question & Answer Chain**: RAG-powered Q&A over your documents
+- **Summarization Chain**: Summarize long documents efficiently
+- **Information Extractor**: Extract structured data from unstructured text
+- **Text Classifier**: Classify text into categories
+- **Sentiment Analysis**: Analyze sentiment in text
+
+### Agents
+
+Agents are autonomous AI systems that can use tools and make decisions:
+
+- Execute multi-step reasoning
+- Use tools like web search, calculators, and custom workflows
+- Maintain conversation context with memory
+- Handle complex tasks autonomously
+
+[Learn more about AI Agents →](/ai/agents)
+
+### Vector Stores & Embeddings
+
+Store and retrieve information using semantic search:
+
+- **Vector Stores**: Pinecone, Qdrant, Supabase, Weaviate, and more
+- **Embeddings**: OpenAI, Cohere, Google, and others
+- **Document Loaders**: Load data from various sources
+- **Text Splitters**: Break documents into chunks for processing
+
+[Learn more about Vector Stores →](/ai/vector-stores) | [Learn more about Embeddings →](/ai/embeddings)
+
+## Getting Started
+
+<Steps>
+  <Step title="Choose Your Use Case">
+    Decide what you want to build - a simple LLM chain, a RAG system, or an autonomous agent.
+  </Step>
+  
+  <Step title="Add a Language Model">
+    Add a language model node (e.g., OpenAI Chat Model) and configure your credentials.
+  </Step>
+  
+  <Step title="Build Your Chain or Agent">
+    Add a Chain or Agent node and connect it to your language model.
+  </Step>
+  
+  <Step title="Add Tools or Memory (Optional)">
+    Enhance your agent with tools, memory, or vector store retrieval.
+  </Step>
+  
+  <Step title="Test and Deploy">
+    Test your workflow and deploy it as a webhook, scheduled task, or integration.
+  </Step>
+</Steps>
+
+## Quick Example: Simple Q&A with Memory
+
+Here's a basic example of building a conversational AI with memory:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger"
+    },
+    {
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi"
+    },
+    {
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow"
+    },
+    {
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent"
+    }
+  ]
+}
+```
+
+<Note>
+  This example uses the Chat Trigger node to receive messages, connects to OpenAI's chat model, adds simple memory for context, and processes everything through an AI Agent.
+</Note>
+
+## Architecture Patterns
+
+### RAG (Retrieval Augmented Generation)
+
+RAG combines vector search with LLMs to provide context-aware responses:
+
+```
+Documents → Embeddings → Vector Store → Retriever → Q&A Chain → Response
+```
+
+### Agent with Tools
+
+Agents can use multiple tools to accomplish complex tasks:
+
+```
+User Input → Agent → Tool Selection → Tool Execution → Agent Reasoning → Response
+```
+
+### Multi-Agent Systems
+
+Combine multiple specialized agents for complex workflows:
+
+```
+Coordinator Agent → Research Agent → Analysis Agent → Writing Agent → Final Output
+```
+
+## Best Practices
+
+<Tip>
+  **Start Simple**: Begin with a Basic LLM Chain before moving to more complex agents.
+</Tip>
+
+- **Use Structured Output**: Enable output parsers for reliable data extraction
+- **Implement Memory Wisely**: Choose the right memory type for your use case
+- **Optimize Token Usage**: Use text splitters and limit context window size
+- **Handle Errors**: Enable "Continue on Fail" for production workflows
+- **Monitor Costs**: Track API usage, especially with external LLM providers
+- **Test Thoroughly**: Test with various inputs before deploying
+
+## Advanced Features
+
+### Output Parsers
+
+Structure LLM responses into reliable JSON schemas:
+- **Structured Output Parser**: Define custom schemas
+- **Auto-fixing Parser**: Automatically fix malformed outputs
+- **Item List Parser**: Extract lists from responses
+
+### Memory Types
+
+Choose from various memory implementations:
+- **Simple Memory**: In-memory buffer (development)
+- **Redis Memory**: Distributed memory (production)
+- **Postgres Memory**: Persistent SQL-based memory
+- **MongoDB Memory**: Document-based memory
+- **Zep Memory**: Specialized memory with automatic summarization
+
+### Tools & Integrations
+
+Extend agent capabilities with built-in tools:
+- **HTTP Request Tool**: Make API calls
+- **Calculator Tool**: Perform calculations
+- **Wikipedia Tool**: Search Wikipedia
+- **Workflow Tool**: Call other n8n workflows
+- **Code Tool**: Execute JavaScript/Python code
+- **Vector Store Tool**: Query vector databases
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build Your First Agent" icon="rocket" href="/ai/agents">
+    Learn how to create autonomous AI agents
+  </Card>
+  <Card title="LangChain Nodes Reference" icon="book" href="/ai/langchain-nodes">
+    Explore all available LangChain nodes
+  </Card>
+  <Card title="Vector Stores Guide" icon="database" href="/ai/vector-stores">
+    Set up semantic search with vector databases
+  </Card>
+  <Card title="Embeddings Guide" icon="layers" href="/ai/embeddings">
+    Configure embedding models for your workflows
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [LangChain Documentation](https://docs.langchain.com/)
+- [n8n Community Forum](https://community.n8n.io/)
+- [AI Workflow Templates](https://n8n.io/workflows?categories=AI)
+- [Tutorial: Build a RAG Chatbot](https://docs.n8n.io/advanced-ai/intro-tutorial/)
